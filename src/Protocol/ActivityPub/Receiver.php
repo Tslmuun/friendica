@@ -630,7 +630,7 @@ class Receiver
 			$object_data['object_activity']	= $activity;
 		}
 
-		if (($type == 'as:Create') && $trust_source) {
+		if (($type == 'as:Create') && $trust_source && !in_array($completion, [self::COMPLETION_MANUAL, self::COMPLETION_ANNOUNCE])) {
 			if (self::hasArrived($object_data['object_id'])) {
 				Logger::info('The activity already arrived.', ['id' => $object_data['object_id']]);
 				return true;
@@ -641,6 +641,8 @@ class Receiver
 				Logger::info('The activity is already added.', ['id' => $object_data['object_id']]);
 				return true;
 			}
+		} elseif (($type == 'as:Create') && $trust_source && !self::hasArrived($object_data['object_id'])) {
+			self::addArrivedId($object_data['object_id']);
 		}
 
 		$decouple = DI::config()->get('system', 'decoupled_receiver') && !in_array($completion, [self::COMPLETION_MANUAL, self::COMPLETION_ANNOUNCE]);
@@ -1636,7 +1638,7 @@ class Receiver
 						'type' => str_replace('as:', '', JsonLD::fetchElement($attachment, '@type')),
 						'mediaType' => JsonLD::fetchElement($attachment, 'as:mediaType', '@value'),
 						'name' => JsonLD::fetchElement($attachment, 'as:name', '@value'),
-						'url' => JsonLD::fetchElement($attachment, 'as:url', '@id'),
+						'url' => JsonLD::fetchElement($attachment, 'as:url', '@id') ?? JsonLD::fetchElement($attachment, 'as:href', '@id'),
 						'height' => JsonLD::fetchElement($attachment, 'as:height', '@value'),
 						'width' => JsonLD::fetchElement($attachment, 'as:width', '@value'),
 						'image' => JsonLD::fetchElement($attachment, 'as:image', '@id')
