@@ -79,6 +79,7 @@ class Item
 	const PR_DISTRIBUTE = 79;
 	const PR_PUSHED = 80;
 	const PR_LOCAL = 81;
+	const PR_AUDIENCE = 82;
 
 	// system.accept_only_sharer setting values
 	const COMPLETION_NONE    = 1;
@@ -1624,7 +1625,7 @@ class Item
 
 		if (($uid != 0) && (($item['gravity'] == self::GRAVITY_PARENT) || $is_reshare) &&
 			DI::pConfig()->get($uid, 'system', 'accept_only_sharer') == self::COMPLETION_NONE &&
-			!in_array($item['post-reason'], [self::PR_FOLLOWER, self::PR_TAG, self::PR_TO, self::PR_CC, self::PR_ACTIVITY])) {
+			!in_array($item['post-reason'], [self::PR_FOLLOWER, self::PR_TAG, self::PR_TO, self::PR_CC, self::PR_ACTIVITY, self::PR_AUDIENCE])) {
 			Logger::info('Contact is not a follower, thread will not be stored', ['author' => $item['author-link'], 'uid' => $uid, 'uri-id' => $uri_id, 'post-reason' => $item['post-reason']]);
 			return 0;
 		}
@@ -2509,17 +2510,22 @@ class Item
 	/**
 	 * Returns an array of contact-ids that are allowed to see this object
 	 *
-	 * @param array $obj        Item array with at least uid, allow_cid, allow_gid, deny_cid and deny_gid
-	 * @param bool  $check_dead Prunes unavailable contacts from the result
+	 * @param array $obj              Item array with at least uid, allow_cid, allow_gid, deny_cid and deny_gid
+	 * @param bool  $check_dead       Prunes unavailable contacts from the result
+	 * @param bool  $expand_followers Expand the list of followers
 	 * @return array
 	 * @throws \Exception
 	 */
-	public static function enumeratePermissions(array $obj, bool $check_dead = false): array
+	public static function enumeratePermissions(array $obj, bool $check_dead = false, bool $expand_followers = true): array
 	{
 		$aclFormatter = DI::aclFormatter();
 
+		if (!$expand_followers && (!empty($obj['deny_cid']) || !empty($obj['deny_gid']))) {
+			$expand_followers = true;
+		}
+
 		$allow_people = $aclFormatter->expand($obj['allow_cid']);
-		$allow_groups = Group::expand($obj['uid'], $aclFormatter->expand($obj['allow_gid']), $check_dead);
+		$allow_groups = Group::expand($obj['uid'], $aclFormatter->expand($obj['allow_gid']), $check_dead, $expand_followers);
 		$deny_people  = $aclFormatter->expand($obj['deny_cid']);
 		$deny_groups  = Group::expand($obj['uid'], $aclFormatter->expand($obj['deny_gid']), $check_dead);
 		$recipients   = array_unique(array_merge($allow_people, $allow_groups));
@@ -3038,7 +3044,12 @@ class Item
 		} elseif (empty($shared_item['uri-id']) && empty($item['quote-uri-id']) && ($item['network'] != Protocol::DIASPORA)) {
 			$media = Post\Media::getByURIId($item['uri-id'], [Post\Media::ACTIVITY]);
 			if (!empty($media)) {
-				$shared_item = Post::selectFirst($fields, ['plink' => $media[0]['url'], 'uid' => [$item['uid'], 0]]);
+				$shared_item = Post::selectFirst($fields, ['uri-id' => $media[0]['media-uri-id'], 'uid' => [$item['uid'], 0]]);
+				if (empty($shared_item['uri-id'])) {
+					$shared_item = Post::selectFirst($fields, ['plink' => $media[0]['url'], 'uid' => [$item['uid'], 0]]);
+				} elseif (strtolower($shared['post']['uri']) != strtolower($media[0]['url'])) {
+					$shared_links[] = strtolower($media[0]['url']);
+				}
 
 				if (empty($shared_item['uri-id'])) {
 					$shared_item = Post::selectFirst($fields, ['uri' => $media[0]['url'], 'uid' => [$item['uid'], 0]]);
