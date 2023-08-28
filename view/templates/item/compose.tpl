@@ -44,6 +44,12 @@
 					<button type="button" class="btn btn-sm template-icon quote" aria-label="{{$l10n.edquote}}" title="{{$l10n.edquote}}" onclick="insertFormatting('quote',{{$id}});" tabindex="13">
 						<i class="fa fa-quote-left"></i>
 					</button>
+					<button id="button_emojipicker" type="button" class="btn btn-sm template-icon emojis" aria-label="{{$l10n.edemojis}}" title="{{$l10n.edemojis}}" tabindex="14">
+						<i class="fa fa-smile-o"></i>
+					</button>
+					<button type="button" class="btn btn-sm template-icon bb-url" aria-label="{{$l10n.contentwarn}}" title="{{$l10n.contentwarn}}" onclick="insertFormatting('abstract',{{$id}});" tabindex="9">
+						<i class="fa fa-eye"></i>
+					</button>
 				</span>
 			</p>
 			<div id="dropzone-{{$id}}" class="dropzone" style="overflow:scroll">
@@ -87,14 +93,14 @@
 			{{if $scheduled_at}}{{$scheduled_at nofilter}}{{/if}}
 			{{if $created_at}}{{$created_at nofilter}}{{/if}}
 {{else}}
-			<input type="hidden" name="group_allow" value="{{$group_allow}}"/>
+			<input type="hidden" name="circle_allow" value="{{$circle_allow}}"/>
 			<input type="hidden" name="contact_allow" value="{{$contact_allow}}"/>
-			<input type="hidden" name="group_deny" value="{{$group_deny}}"/>
+			<input type="hidden" name="circle_deny" value="{{$circle_deny}}"/>
 			<input type="hidden" name="contact_deny" value="{{$contact_deny}}"/>
 {{/if}}
 		</form>
 	</div>
 </div>
 <script>
-	dzFactory.setupDropzone('#dropzone-{{$id}}', 'comment-edit-text-{{$id}}'); 
+	dzFactory.setupDropzone('#dropzone-{{$id}}', 'comment-edit-text-{{$id}}');
 </script>

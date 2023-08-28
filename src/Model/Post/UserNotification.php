@@ -133,14 +133,14 @@ class UserNotification
 	public static function setNotification(int $uri_id, int $uid)
 	{
 		$fields = ['id', 'uri-id', 'parent-uri-id', 'uid', 'body', 'parent', 'gravity', 'vid', 'gravity',
-			'contact-id', 'author-id', 'owner-id', 'causer-id', 
+			'contact-id', 'author-id', 'author-gsid', 'owner-id', 'owner-gsid', 'causer-id', 'causer-gsid',
 			'private', 'thr-parent', 'thr-parent-id', 'parent-uri-id', 'parent-uri', 'verb'];
 		$item   = Post::selectFirst($fields, ['uri-id' => $uri_id, 'uid' => $uid, 'origin' => false]);
 		if (!DBA::isResult($item)) {
 			return;
 		}
 
-		$parent = Post::selectFirstPost(['author-id', 'owner-id', 'causer-id'], ['uri-id' => $item['parent-uri-id']]);
+		$parent = Post::selectFirstPost(['author-id', 'author-gsid', 'owner-id', 'owner-gsid', 'causer-id', 'causer-gsid',], ['uri-id' => $item['parent-uri-id']]);
 		if (!DBA::isResult($parent)) {
 			return;
 		}
@@ -191,6 +191,13 @@ class UserNotification
 			}
 			if (Contact\User::isBlocked($author_id, $uid) || Contact\User::isIgnored($author_id, $uid) || Contact\User::isCollapsed($author_id, $uid)) {
 				Logger::debug('Author is blocked/ignored/collapsed by user', ['uid' => $uid, 'author' => $author_id, 'uri-id' => $item['uri-id']]);
+				return;
+			}
+		}
+
+		foreach (array_unique([$parent['author-gsid'], $parent['owner-gsid'], $parent['causer-gsid'], $item['author-gsid'], $item['owner-gsid'], $item['causer-gsid']]) as $gsid) {
+			if ($gsid && DI::userGServer()->isIgnoredByUser($uid, $gsid)) {
+				Logger::debug('Server is ignored by user', ['uid' => $uid, 'gsid' => $gsid, 'uri-id' => $item['uri-id']]);
 				return;
 			}
 		}
@@ -398,45 +405,23 @@ class UserNotification
 	 */
 	private static function getProfileForUser(int $uid): array
 	{
-		$notification_data = ['uid' => $uid, 'profiles' => []];
-		Hook::callAll('check_item_notification', $notification_data);
-
-		$profiles = $notification_data['profiles'];
-
-		$user = DBA::selectFirst('user', ['nickname'], ['uid' => $uid]);
-		if (!DBA::isResult($user)) {
-			return [];
-		}
-
-		$owner = DBA::selectFirst('contact', ['url', 'alias'], ['self' => true, 'uid' => $uid]);
+		$owner = User::getOwnerDataById($uid);
 		if (!DBA::isResult($owner)) {
 			return [];
 		}
 
-		// This is our regular URL format
-		$profiles[] = $owner['url'];
+		$profiles = [$owner['nurl']];
 
-		// Now the alias
-		$profiles[] = $owner['alias'];
+		$notification_data = ['uid' => $uid, 'profiles' => []];
+		Hook::callAll('check_item_notification', $notification_data);
 
-		// Notifications from Diaspora often have a URL in the Diaspora format
-		$profiles[] = DI::baseUrl() . '/u/' . $user['nickname'];
-
-		// Validate and add profile links
-		foreach ($profiles as $key => $profile) {
-			// Check for invalid profile urls (without scheme, host or path) and remove them
+		// Normalize the connector profiles
+		foreach ($notification_data['profiles'] as $profile) {
 			if (empty(parse_url($profile, PHP_URL_SCHEME)) || empty(parse_url($profile, PHP_URL_HOST)) || empty(parse_url($profile, PHP_URL_PATH))) {
-				unset($profiles[$key]);
-				continue;
+				$profiles[] = $profile;
+			} else {
+				$profiles[] = Strings::normaliseLink($profile);
 			}
-
-			// Add the normalized form
-			$profile    = Strings::normaliseLink($profile);
-			$profiles[] = $profile;
-
-			// Add the SSL form
-			$profile    = str_replace('http://', 'https://', $profile);
-			$profiles[] = $profile;
 		}
 
 		return array_unique($profiles);

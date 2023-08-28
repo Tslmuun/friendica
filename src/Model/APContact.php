@@ -119,6 +119,11 @@ class APContact
 			return [];
 		}
 
+		if (!Network::isValidHttpUrl($url) && !filter_var($url, FILTER_VALIDATE_EMAIL)) {
+			Logger::info('Invalid URL', ['url' => $url]);
+			return [];
+		}
+
 		$fetched_contact = [];
 
 		if (empty($update)) {
@@ -579,6 +584,14 @@ class APContact
 	 */
 	public static function isRelay(array $apcontact): bool
 	{
+		if (in_array($apcontact['type'], ['Person', 'Organization'])) {
+			return false;
+		}
+
+		if (($apcontact['type'] == 'Service') && empty($apcontact['outbox']) && empty($apcontact['sharedinbox']) && empty($apcontact['following']) && empty($apcontact['followers']) && empty($apcontact['statuses_count'])) {
+			return true;
+		}
+
 		if (empty($apcontact['nick']) || $apcontact['nick'] != 'relay') {
 			return false;
 		}

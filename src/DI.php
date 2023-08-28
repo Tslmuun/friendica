@@ -22,6 +22,8 @@
 namespace Friendica;
 
 use Dice\Dice;
+use Friendica\Core\Logger\Capability\ICheckLoggerSettings;
+use Friendica\Core\Logger\Util\LoggerSettingsCheck;
 use Friendica\Core\Session\Capability\IHandleSessions;
 use Friendica\Core\Session\Capability\IHandleUserSessions;
 use Friendica\Navigation\SystemMessages;
@@ -208,9 +210,9 @@ abstract class DI
 		return self::$dice->create(Core\Config\Util\ConfigFileManager::class);
 	}
 
-	public static function keyValue(): Core\KeyValueStorage\Capabilities\IManageKeyValuePairs
+	public static function keyValue(): Core\KeyValueStorage\Capability\IManageKeyValuePairs
 	{
-		return self::$dice->create(Core\KeyValueStorage\Capabilities\IManageKeyValuePairs::class);
+		return self::$dice->create(Core\KeyValueStorage\Capability\IManageKeyValuePairs::class);
 	}
 
 	/**
@@ -293,6 +295,11 @@ abstract class DI
 			->addRule(LoggerInterface::class, self::$dice->getRule(LoggerInterface::class))
 			->addRule('$devLogger', self::$dice->getRule('$devLogger'));
 		static::init($flushDice);
+	}
+
+	public static function logCheck(): ICheckLoggerSettings
+	{
+		return self::$dice->create(LoggerSettingsCheck::class);
 	}
 
 	/**
@@ -665,6 +672,15 @@ abstract class DI
 	}
 
 	//
+	// "User" namespace instances
+	//
+
+	public static function userGServer(): User\Settings\Repository\UserGServer
+	{
+		return self::$dice->create(User\Settings\Repository\UserGServer::class);
+	}
+
+	//
 	// "Util" namespace instances
 	//
 
@@ -690,14 +706,6 @@ abstract class DI
 	public static function dtFormat()
 	{
 		return self::$dice->create(Util\DateTimeFormat::class);
-	}
-
-	/**
-	 * @return Util\FileSystem
-	 */
-	public static function fs()
-	{
-		return self::$dice->create(Util\FileSystem::class);
 	}
 
 	/**

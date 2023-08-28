@@ -38,6 +38,8 @@ class Xrd extends BaseModule
 {
 	protected function rawContent(array $request = [])
 	{
+		header('Vary: Accept', false);
+
 		// @TODO: Replace with parameter from router
 		if (DI::args()->getArgv()[0] == 'xrd') {
 			if (empty($_GET['uri'])) {
@@ -65,14 +67,22 @@ class Xrd extends BaseModule
 
 		if (substr($uri, 0, 4) === 'http') {
 			$name = ltrim(basename($uri), '~');
+			$host = parse_url($uri, PHP_URL_HOST);
 		} else {
 			$local = str_replace('acct:', '', $uri);
 			if (substr($local, 0, 2) == '//') {
 				$local = substr($local, 2);
 			}
 
-			$name = substr($local, 0, strpos($local, '@'));
+			list($name, $host) = explode('@', $local);
 		}
+
+		if (!empty($host) && $host !== DI::baseUrl()->getHost()) {
+			DI::logger()->notice('Invalid host name for xrd query',['host' => $host, 'uri' => $uri]);
+			throw new NotFoundException('Invalid host name for xrd query: ' . $host);
+		}
+
+		header('Vary: Accept', false);
 
 		if ($name == User::getActorName()) {
 			$owner = User::getSystemAccount();
@@ -320,7 +330,6 @@ class Xrd extends BaseModule
 		]);
 
 		header('Access-Control-Allow-Origin: *');
-
 		System::httpExit($xmlString, Response::TYPE_XML, 'application/xrd+xml');
 	}
 }

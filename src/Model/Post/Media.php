@@ -463,7 +463,7 @@ class Media
 	 */
 	private static function isLinkToPhoto(string $page, string $preview): bool
 	{
-		return preg_match('#/photo/.*-0\.#ism', $page) && preg_match('#/photo/.*-[01]\.#ism', $preview);
+		return preg_match('#/photo/.*-0\.#ism', $page) && preg_match('#/photo/.*-[012]\.#ism', $preview);
 	}
 
 	/**
@@ -475,7 +475,34 @@ class Media
 	 */
 	private static function isLinkToImagePage(string $page, string $preview): bool
 	{
-		return preg_match('#/photos/.*/image/#ism', $page) && preg_match('#/photo/.*-[01]\.#ism', $preview);
+		return preg_match('#/photos/.*/image/#ism', $page) && preg_match('#/photo/.*-[012]\.#ism', $preview);
+	}
+
+	/**
+	 * Replace the image link in Friendica image posts with a link to the image
+	 *
+	 * @param string $body
+	 * @return string
+	 */
+	public static function replaceImage(string $body): string
+	{
+		if (preg_match_all("#\[url=([^\]]+?)\]\s*\[img=([^\[\]]*)\]([^\[\]]*)\[\/img\]\s*\[/url\]#ism", $body, $pictures, PREG_SET_ORDER)) {
+			foreach ($pictures as $picture) {
+				if (self::isLinkToImagePage($picture[1], $picture[2])) {
+					$body = str_replace($picture[0], Images::getBBCodeByUrl(str_replace(['-1.', '-2.'], '-0.', $picture[2]), $picture[2], $picture[3]), $body);
+				}
+			}
+		}
+
+		if (preg_match_all("#\[url=([^\]]+?)\]\s*\[img\]([^\[]+?)\[/img\]\s*\[/url\]#ism", $body, $pictures, PREG_SET_ORDER)) {
+			foreach ($pictures as $picture) {
+				if (self::isLinkToImagePage($picture[1], $picture[2])) {
+					$body = str_replace($picture[0], Images::getBBCodeByUrl(str_replace(['-1.', '-2.'], '-0.', $picture[2]), $picture[2]), $body);
+				}
+			}
+		}
+
+		return $body;
 	}
 
 	/**
@@ -498,7 +525,7 @@ class Media
 			foreach ($pictures as $picture) {
 				if (self::isLinkToImagePage($picture[1], $picture[2])) {
 					$body = str_replace($picture[0], '', $body);
-					$image = str_replace('-1.', '-0.', $picture[2]);
+					$image = str_replace(['-1.', '-2.'], '-0.', $picture[2]);
 					$attachments[$image] = [
 						'uri-id' => $uriid, 'type' => self::IMAGE, 'url' => $image,
 						'preview' => $picture[2], 'description' => $picture[3]
@@ -530,7 +557,7 @@ class Media
 			foreach ($pictures as $picture) {
 				if (self::isLinkToImagePage($picture[1], $picture[2])) {
 					$body = str_replace($picture[0], '', $body);
-					$image = str_replace('-1.', '-0.', $picture[2]);
+					$image = str_replace(['-1.', '-2.'], '-0.', $picture[2]);
 					$attachments[$image] = [
 						'uri-id' => $uriid, 'type' => self::IMAGE, 'url' => $image,
 						'preview' => $picture[2], 'description' => null
@@ -977,19 +1004,7 @@ class Media
 			}
 
 			if ($media['type'] == self::IMAGE) {
-				if (!empty($media['preview'])) {
-					if (!empty($media['description'])) {
-						$body .= "\n[url=" . $media['url'] . "][img=" . $media['preview'] . ']' . $media['description'] . '[/img][/url]';
-					} else {
-						$body .= "\n[url=" . $media['url'] . "][img]" . $media['preview'] . '[/img][/url]';
-					}
-				} else {
-					if (!empty($media['description'])) {
-						$body .= "\n[img=" . $media['url'] . ']' . $media['description'] . '[/img]';
-					} else {
-						$body .= "\n[img]" . $media['url'] . '[/img]';
-					}
-				}
+				$body .= "\n" . Images::getBBCodeByUrl($media['url'], $media['preview'], $media['description'] ?? '');
 			} elseif ($media['type'] == self::AUDIO) {
 				$body .= "\n[audio]" . $media['url'] . "[/audio]\n";
 			} elseif ($media['type'] == self::VIDEO) {

@@ -42,9 +42,9 @@ class Federation extends BaseAdmin
 			'akkoma'       => ['name' => 'Akkoma', 'color' => '#9574cd'], // Color from the page
 			'birdsitelive' => ['name' => 'BirdsiteLIVE', 'color' => '#1b6ec2'], // Color from the page
 			'bookwyrm'     => ['name' => 'BookWyrm', 'color' => '#00d1b2'], // Color from the page
-			'calckey'      => ['name' => 'Calckey', 'color' => '#286983'], // Color from the page
 			'castopod'     => ['name' => 'Castopod', 'color' => '#00564a'], // Background color from the page
 			'diaspora'     => ['name' => 'Diaspora', 'color' => '#a1a1a1'], // logo is black and white, makes a gray
+			'calckey'      => ['name' => 'firefish (Calckey)', 'color' => '#1c4a5c'], // Color from the page
 			'foundkey'     => ['name' => 'Foundkey', 'color' => '#609926'], // Some random color from the repository
 			'funkwhale'    => ['name' => 'Funkwhale', 'color' => '#4082B4'], // From the homepage
 			'gancio'       => ['name' => 'Gancio', 'color' => '#7253ed'], // Fontcolor from the page
@@ -53,6 +53,7 @@ class Federation extends BaseAdmin
 			'hometown'     => ['name' => 'Hometown', 'color' => '#1f70c1'], // Color from the Patreon page
 			'honk'         => ['name' => 'Honk', 'color' => '##0d0d0d'], // Background color from the page
 			'hubzilla'     => ['name' => 'Hubzilla/Red Matrix', 'color' => '#43488a'], // blue from the logo
+			'kbin'         => ['name' => 'kbin', 'color' => '#61366b'], // Color from their main instance
 			'lemmy'        => ['name' => 'Lemmy', 'color' => '#00c853'], // Green from the page
 			'mastodon'     => ['name' => 'Mastodon', 'color' => '#1a9df9'], // blue from the Mastodon logo
 			'microblog'    => ['name' => 'Microblog', 'color' => '#fdb52b'], // Color from the page
@@ -115,6 +116,8 @@ class Federation extends BaseAdmin
 					$version['version'] = $gserver['platform'] . ' ' . $version['version'];
 				} elseif (in_array($gserver['platform'], ['activityrelay', 'pub-relay', 'selective-relay', 'aoderelay'])) {
 					$version['version'] = $gserver['platform'] . '-' . $version['version'];
+				} elseif (in_array($gserver['platform'], ['calckey', 'firefish'])) {
+					$version['version'] = $gserver['platform'] . '-' . $version['version'];
 				}
 
 				$versionCounts[] = $version;
@@ -125,6 +128,8 @@ class Federation extends BaseAdmin
 
 			if ($platform == 'friendika') {
 				$platform = 'friendica';
+			} elseif (in_array($platform, ['calckey', 'firefish'])) {
+				$platform = 'calckey';
 			} elseif (in_array($platform, ['red matrix', 'redmatrix', 'red'])) {
 				$platform = 'hubzilla';
 			} elseif (in_array($platform, ['osada', 'mistpark', 'roadhouse', 'streams', 'zap'])) {

@@ -51,8 +51,8 @@ Fields
 | archive                   |                                                                                                                | boolean            | NO   |     | 0                   |                |
 | unsearchable              | Contact prefers to not be searchable                                                                           | boolean            | NO   |     | 0                   |                |
 | sensitive                 | Contact posts sensitive content                                                                                | boolean            | NO   |     | 0                   |                |
-| baseurl                   | baseurl of the contact                                                                                         | varbinary(383)     | YES  |     |                     |                |
-| gsid                      | Global Server ID                                                                                               | int unsigned       | YES  |     | NULL                |                |
+| baseurl                   | baseurl of the contact from the gserver record, can be missing                                                 | varbinary(383)     | YES  |     |                     |                |
+| gsid                      | Global Server ID, can be missing                                                                               | int unsigned       | YES  |     | NULL                |                |
 | bd                        |                                                                                                                | date               | NO   |     | 0001-01-01          |                |
 | reason                    |                                                                                                                | text               | YES  |     | NULL                |                |
 | self                      | 1 if the contact is the user him/her self                                                                      | boolean            | NO   |     | 0                   |                |
@@ -81,7 +81,7 @@ Fields
 | confirm                   |                                                                                                                | varbinary(383)     | YES  |     | NULL                |                |
 | poco                      |                                                                                                                | varbinary(383)     | YES  |     | NULL                |                |
 | writable                  |                                                                                                                | boolean            | NO   |     | 0                   |                |
-| forum                     | contact is a forum. Deprecated, use 'contact-type' = 'community' and 'manually-approve' = false instead        | boolean            | NO   |     | 0                   |                |
+| forum                     | contact is a group. Deprecated, use 'contact-type' = 'community' and 'manually-approve' = false instead        | boolean            | NO   |     | 0                   |                |
 | prv                       | contact is a private group. Deprecated, use 'contact-type' = 'community' and 'manually-approve' = true instead | boolean            | NO   |     | 0                   |                |
 | bdyear                    |                                                                                                                | varchar(4)         | NO   |     |                     |                |
 | site-pubkey               | Deprecated                                                                                                     | text               | YES  |     | NULL                |                |

@@ -135,6 +135,28 @@ class Relay
 			}
 		}
 
+		if (!self::isWantedLanguage($body)) {
+			Logger::info('Unwanted or Undetected language found - rejected', ['network' => $network, 'url' => $url, 'causer' => $causer, 'tags' => $tags]);
+			return false;
+		}
+
+		if ($scope == self::SCOPE_ALL) {
+			Logger::info('Server accept all posts - accepted', ['network' => $network, 'url' => $url, 'causer' => $causer, 'tags' => $tags]);
+			return true;
+		}
+
+		Logger::info('No matching hashtags found - rejected', ['network' => $network, 'url' => $url, 'causer' => $causer, 'tags' => $tags]);
+		return false;
+	}
+
+	/**
+	 * Detect the language of a post and decide if the post should be accepted
+	 *
+	 * @param string $body
+	 * @return boolean
+	 */
+	public static function isWantedLanguage(string $body)
+	{
 		$languages = [];
 		foreach (Item::getLanguageArray($body, 10) as $language => $reliability) {
 			if ($reliability > 0) {
@@ -142,25 +164,19 @@ class Relay
 			}
 		}
 
-		Logger::debug('Got languages', ['languages' => $languages, 'body' => $body, 'causer' => $causer]);
+		Logger::debug('Got languages', ['languages' => $languages, 'body' => $body]);
 
 		if (!empty($languages)) {
-			if (in_array($languages[0], $config->get('system', 'relay_deny_languages'))) {
-				Logger::info('Unwanted language found - rejected', ['language' => $languages[0], 'network' => $network, 'url' => $url, 'causer' => $causer]);
+			if (in_array($languages[0], DI::config()->get('system', 'relay_deny_languages'))) {
+				Logger::info('Unwanted language found', ['language' => $languages[0]]);
 				return false;
 			}
-		} elseif ($config->get('system', 'relay_deny_undetected_language')) {
-			Logger::info('Undetected language found - rejected', ['body' => $body, 'network' => $network, 'url' => $url, 'causer' => $causer]);
+		} elseif (DI::config()->get('system', 'relay_deny_undetected_language')) {
+			Logger::info('Undetected language found', ['body' => $body]);
 			return false;
 		}
 
-		if ($scope == self::SCOPE_ALL) {
-			Logger::info('Server accept all posts - accepted', ['network' => $network, 'url' => $url, 'causer' => $causer]);
-			return true;
-		}
-
-		Logger::info('No matching hashtags found - rejected', ['network' => $network, 'url' => $url, 'causer' => $causer]);
-		return false;
+		return true;
 	}
 
 	/**
@@ -338,7 +354,7 @@ class Relay
 	public static function getList(array $fields = []): array
 	{
 		return DBA::selectToArray('apcontact', $fields,
-			["`type` = ? AND `url` IN (SELECT `url` FROM `contact` WHERE `uid` = ? AND `rel` = ?)", 'Application', 0, Contact::FRIEND]);
+			["`type` IN (?, ?) AND `url` IN (SELECT `url` FROM `contact` WHERE `uid` = ? AND `rel` = ?)", 'Application', 'Service', 0, Contact::FRIEND]);
 	}
 
 	/**

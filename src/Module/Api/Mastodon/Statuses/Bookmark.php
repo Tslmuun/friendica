@@ -42,7 +42,7 @@ class Bookmark extends BaseApi
 			DI::mstdnError()->UnprocessableEntity();
 		}
 
-		$item = Post::selectOriginal(['uid', 'id', 'gravity'], ['uri-id' => $this->parameters['id'], 'uid' => [$uid, 0]], ['order' => ['uid' => true]]);
+		$item = Post::selectOriginal(['uid', 'id', 'uri-id', 'gravity'], ['uri-id' => $this->parameters['id'], 'uid' => [$uid, 0]], ['order' => ['uid' => true]]);
 		if (!DBA::isResult($item)) {
 			DI::mstdnError()->RecordNotFound();
 		}
@@ -52,7 +52,7 @@ class Bookmark extends BaseApi
 		}
 
 		if ($item['uid'] == 0) {
-			$stored = Item::storeForUserByUriId($item['id'], $uid, ['post-reason' => Item::PR_ACTIVITY]);
+			$stored = Item::storeForUserByUriId($item['uri-id'], $uid, ['post-reason' => Item::PR_ACTIVITY]);
 			if (!empty($stored)) {
 				$item = Post::selectFirst(['id', 'gravity'], ['id' => $stored]);
 				if (!DBA::isResult($item)) {
@@ -65,6 +65,11 @@ class Bookmark extends BaseApi
 
 		Item::update(['starred' => true], ['id' => $item['id']]);
 
-		System::jsonExit(DI::mstdnStatus()->createFromUriId($this->parameters['id'], $uid, self::appSupportsQuotes())->toArray());
+		// @TODO Remove once mstdnStatus()->createFromUriId is fixed so that it returns posts not reshared posts if given an ID to an original post that has been reshared
+		// Introduced in this PR: https://github.com/friendica/friendica/pull/13175
+		// Issue tracking the behavior of createFromUriId: https://github.com/friendica/friendica/issues/13350
+		$isReblog = $item['uri-id'] != $this->parameters['id'];
+
+		System::jsonExit(DI::mstdnStatus()->createFromUriId($this->parameters['id'], $uid, self::appSupportsQuotes(), $isReblog)->toArray());
 	}
 }

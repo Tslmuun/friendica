@@ -37,6 +37,7 @@ use Friendica\Database\DBA;
 use Friendica\DI;
 use Friendica\Module;
 use Friendica\Network\HTTPClient\Client\HttpClientAccept;
+use Friendica\Network\HTTPException\InternalServerErrorException;
 use Friendica\Security\TwoFactor\Model\AppSpecificPassword;
 use Friendica\Network\HTTPException;
 use Friendica\Object\Image;
@@ -88,7 +89,7 @@ class User
 	 * ACCOUNT_TYPE_NEWS - the account is a news reflector
 	 *	Associated page type: PAGE_FLAGS_SOAPBOX
 	 *
-	 * ACCOUNT_TYPE_COMMUNITY - the account is community forum
+	 * ACCOUNT_TYPE_COMMUNITY - the account is community group
 	 *	Associated page types: PAGE_COMMUNITY, PAGE_FLAGS_PRVGROUP
 	 *
 	 * ACCOUNT_TYPE_RELAY - the account is a relay
@@ -133,6 +134,17 @@ class User
 	}
 
 	/**
+	 * Get the Uri-Id of the system account
+	 *
+	 * @return integer
+	 */
+	public static function getSystemUriId(): int
+	{
+		$system = self::getSystemAccount();
+		return $system['uri-id'] ?? 0;
+	}
+
+	/**
 	 * Fetch the system account
 	 *
 	 * @return array system account
@@ -167,7 +179,7 @@ class User
 		$system['region'] = '';
 		$system['postal-code'] = '';
 		$system['country-name'] = '';
-		$system['homepage'] = DI::baseUrl();
+		$system['homepage'] = (string)DI::baseUrl();
 		$system['dob'] = '0000-00-00';
 
 		// Ensure that the user contains data
@@ -483,23 +495,41 @@ class User
 	}
 
 	/**
-	 * Returns the default group for a given user and network
+	 * Returns the default circle for a given user
 	 *
 	 * @param int $uid User id
 	 *
-	 * @return int group id
+	 * @return int circle id
 	 * @throws Exception
 	 */
-	public static function getDefaultGroup(int $uid): int
+	public static function getDefaultCircle(int $uid): int
 	{
 		$user = DBA::selectFirst('user', ['def_gid'], ['uid' => $uid]);
 		if (DBA::isResult($user)) {
-			$default_group = $user["def_gid"];
+			$default_circle = $user['def_gid'];
 		} else {
-			$default_group = 0;
+			$default_circle = 0;
 		}
 
-		return $default_group;
+		return $default_circle;
+	}
+
+	/**
+	 * Returns the default circle for groups for a given user
+	 *
+	 * @param int $uid User id
+	 *
+	 * @return int circle id
+	 * @throws Exception
+	 */
+	public static function getDefaultGroupCircle(int $uid): int
+	{
+		$default_circle = DI::pConfig()->get($uid, 'system', 'default-group-gid');
+		if (empty($default_circle)) {
+			$default_circle = self::getDefaultCircle($uid);
+		}
+
+		return $default_circle;
 	}
 
 	/**
@@ -675,6 +705,10 @@ class User
 	 */
 	public static function updateLastActivity(int $uid)
 	{
+		if (!$uid) {
+			return;
+		}
+
 		$user = User::getById($uid, ['last-activity']);
 		if (empty($user)) {
 			return;
@@ -845,6 +879,20 @@ class User
 			'uid'   => $uid,
 			'email' => self::getAdminEmailList()
 		]);
+	}
+
+	/**
+	 * Returns if the given uid is valid and a moderator
+	 *
+	 * @param int $uid
+	 *
+	 * @return bool
+	 * @throws Exception
+	 */
+	public static function isModerator(int $uid): bool
+	{
+		// @todo Replace with a moderator check in the future
+		return self::isSiteAdmin($uid);
 	}
 
 	/**
@@ -1188,13 +1236,13 @@ class User
 			throw new Exception(DI::l10n()->t('An error occurred creating your self contact. Please try again.'));
 		}
 
-		// Create a group with no members. This allows somebody to use it
-		// right away as a default group for new contacts.
-		$def_gid = Group::create($uid, DI::l10n()->t('Friends'));
+		// Create a circle with no members. This allows somebody to use it
+		// right away as a default circle for new contacts.
+		$def_gid = Circle::create($uid, DI::l10n()->t('Friends'));
 		if (!$def_gid) {
 			DBA::delete('user', ['uid' => $uid]);
 
-			throw new Exception(DI::l10n()->t('An error occurred creating your default contact group. Please try again.'));
+			throw new Exception(DI::l10n()->t('An error occurred creating your default contact circle. Please try again.'));
 		}
 
 		$fields = ['def_gid' => $def_gid];
@@ -1203,6 +1251,11 @@ class User
 		}
 
 		DBA::update('user', $fields, ['uid' => $uid]);
+
+		$def_gid_groups = Circle::create($uid, DI::l10n()->t('Groups'));
+		if ($def_gid_groups) {
+			DI::pConfig()->set($uid, 'system', 'default-group-gid', $def_gid_groups);
+		}
 
 		// if we have no OpenID photo try to look up an avatar
 		if (!strlen($photo)) {
@@ -1276,33 +1329,18 @@ class User
 	/**
 	 * Update a user entry and distribute the changes if needed
 	 *
-	 * @param array $fields
+	 * @param array   $fields
 	 * @param integer $uid
 	 * @return boolean
+	 * @throws Exception
 	 */
 	public static function update(array $fields, int $uid): bool
 	{
-		$old_owner = self::getOwnerDataById($uid);
-		if (empty($old_owner)) {
-			return false;
-		}
-
 		if (!DBA::update('user', $fields, ['uid' => $uid])) {
 			return false;
 		}
 
-		$update = Contact::updateSelfFromUserID($uid);
-
-		$owner = self::getOwnerDataById($uid);
-		if (empty($owner)) {
-			return false;
-		}
-
-		if ($old_owner['name'] != $owner['name']) {
-			Profile::update(['name' => $owner['name']], $uid);
-		}
-
-		if ($update) {
+		if (Contact::updateSelfFromUserID($uid)) {
 			Profile::publishUpdate($uid);
 		}
 
@@ -1640,7 +1678,7 @@ class User
 	 */
 	public static function identities(int $uid): array
 	{
-		if (empty($uid)) {
+		if (!$uid) {
 			return [];
 		}
 
@@ -1651,7 +1689,7 @@ class User
 			return $identities;
 		}
 
-		if ($user['parent-uid'] == 0) {
+		if (!$user['parent-uid']) {
 			// First add our own entry
 			$identities = [[
 				'uid' => $user['uid'],
@@ -1712,7 +1750,7 @@ class User
 	 */
 	public static function hasIdentities(int $uid): bool
 	{
-		if (empty($uid)) {
+		if (!$uid) {
 			return false;
 		}
 
@@ -1721,7 +1759,7 @@ class User
 			return false;
 		}
 
-		if ($user['parent-uid'] != 0) {
+		if ($user['parent-uid']) {
 			return true;
 		}
 
@@ -1848,8 +1886,8 @@ class User
 	{
 		$condition = [
 			'email'           => self::getAdminEmailList(),
-			'parent-uid'      => 0,
-			'blocked'         => 0,
+			'parent-uid'      => null,
+			'blocked'         => false,
 			'verified'        => true,
 			'account_removed' => false,
 			'account_expired' => false,

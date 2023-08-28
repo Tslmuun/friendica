@@ -36,6 +36,12 @@
 				<button type="button" class="btn btn-sm template-icon quote" style="cursor: pointer;" aria-label="{{$edquote}}" title="{{$edquote}}" onclick="insertFormatting('quote',{{$id}});">
 					<i class="fa fa-quote-left"></i>
 				</button>
+				<button type="button" class="btn btn-sm template-icon emojis" style="cursor: pointer;" aria-label="{{$edemojis}}" title="{{$edemojis}}">
+					<i class="fa fa-smile-o"></i>
+				</button>
+				<button type="button" class="btn btn-sm template-icon bold" style="cursor: pointer;" aria-label="{{$contentwarn}}" title="{{$contentwarn}}" onclick="insertFormatting('abstract',{{$id}});">
+					<i class="fa fa-eye"></i>
+				</button>
 			</span>
 			</p>
 			<div id="dropzone-{{$id}}" class="dropzone">

@@ -41,7 +41,7 @@
 					<button type="button" class="navbar-toggle collapsed pull-left visible-sm visible-xs"
 						data-toggle="offcanvas" data-target="aside" aria-haspopup="true">
 						<span class="sr-only">Toggle navigation</span>
-						<i class="fa fa-ellipsis-v fa-fw fa-lg" aria-hidden="true"></i>
+						<i class="fa fa-angle-double-right fa-fw fa-lg" aria-hidden="true"></i>
 					</button>
 
 					{{* Left section of the NavBar with navigation shortcuts/icons *}}
@@ -274,8 +274,14 @@
 											</a>
 										</li>
 									{{/if}}
+									<li role="presentation" class="divider"></li>
+									<li role="presentation">
+										<a role="menuitem" id="nav-about-link" class="nav-link {{$nav.about.2}}"
+											href="{{$nav.about.0}}" title="{{$nav.about.3}}">
+											<i class="fa fa-info fa-fw" aria-hidden="true"></i> {{$nav.about.1}}
+										</a>
+									</li>
 									{{if $nav.tos}}
-										<li role="presentation" class="divider"></li>
 										<li role="presentation">
 											<a role="menuitem" id="nav-tos-link" class="nav-link {{$nav.tos.2}}"
 												href="{{$nav.tos.0}}" title="{{$nav.tos.3}}"><i class="fa fa-file-text"
@@ -401,6 +407,14 @@
 									</a>
 								</li>
 							{{/if}}
+							<li role="presentation" class="divider"></li>
+							<li role="presentation" class="list-group-item">
+								<a role="menuitem" class="nav-link {{$nav.about.2}}"
+								   href="{{$nav.about.0}}" title="{{$nav.about.3}}">
+									<i class="fa fa-info fa-fw" aria-hidden="true"></i> {{$nav.about.1}}
+								</a>
+							</li>
+							<li role="presentation" class="divider"></li>
 							{{if $nav.logout}}
 								<li role="presentation" class="list-group-item">
 									<a role="menuitem"

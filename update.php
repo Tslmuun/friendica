@@ -1326,3 +1326,54 @@ function update_1518()
 
 	return Update::SUCCESS;
 }
+
+function update_1520(): int
+{
+	DBA::update('user', ['parent-uid' => null], ['parent-uid' => 0]);
+
+	return Update::SUCCESS;
+}
+
+/**
+ * user-contact.remote_self was wrongly declared as boolean, possibly truncating integer values from contact.remote_self
+ *
+ * @return int
+ * @throws Exception
+ */
+function update_1524(): int
+{
+	$contacts = DBA::select('contact', ['uid', 'uri-id', 'remote_self'], ["`uid` != ?", 0]);
+	while ($contact = DBA::fetch($contacts)) {
+		Contact\User::insertForContactArray($contact);
+	}
+
+	return Update::SUCCESS;
+}
+
+function update_1525(): int
+{
+	// Use expected value for user.username
+	if (!DBA::e('UPDATE `user` u
+    JOIN `profile` p
+    ON p.`uid` = u.`uid`
+    SET u.`username` = p.`name`
+    WHERE p.`name` != ""')) {
+		return Update::FAILED;
+	}
+
+	// Blank out deprecated field profile.name to avoid future confusion
+	if (!DBA::e('UPDATE `profile` p
+    SET p.`name` = ""')) {
+		return Update::FAILED;
+	}
+
+	// Update users' self-contact name if needed
+	if (!DBA::e('UPDATE `contact` c
+    JOIN `user` u
+    ON u.`uid` = c.`uid` AND c.`self` = 1
+    SET c.`name` = u.`username`')) {
+		return Update::FAILED;
+	}
+
+	return Update::SUCCESS;
+}

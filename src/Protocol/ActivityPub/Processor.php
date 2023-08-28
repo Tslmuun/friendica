@@ -42,6 +42,7 @@ use Friendica\Model\Mail;
 use Friendica\Model\Tag;
 use Friendica\Model\User;
 use Friendica\Model\Post;
+use Friendica\Moderation\Entity\Report;
 use Friendica\Protocol\Activity;
 use Friendica\Protocol\ActivityPub;
 use Friendica\Protocol\Delivery;
@@ -415,13 +416,13 @@ class Processor
 			$item['post-type'] = Item::PT_NOTE;
 		}
 
-		$item['isForum'] = false;
+		$item['isGroup'] = false;
 
 		if (!empty($activity['thread-completion'])) {
 			if ($activity['thread-completion'] != $item['owner-id']) {
 				$actor = Contact::getById($activity['thread-completion'], ['url']);
 				$item['causer-link'] = $actor['url'];
-				$item['causer-id'] = $activity['thread-completion'];
+				$item['causer-id']   = $activity['thread-completion'];
 				Logger::info('Use inherited actor as causer.', ['id' => $item['owner-id'], 'activity' => $activity['thread-completion'], 'owner' => $item['owner-link'], 'actor' => $actor['url']]);
 			} else {
 				// Store the original actor in the "causer" fields to enable the check for ignored or blocked contacts
@@ -431,10 +432,41 @@ class Processor
 			}
 
 			$item['owner-link'] = $item['author-link'];
-			$item['owner-id'] = $item['author-id'];
+			$item['owner-id']   = $item['author-id'];
+		}
+
+		if (!$item['isGroup'] && !empty($activity['receiver_urls']['as:audience'])) {
+			foreach ($activity['receiver_urls']['as:audience'] as $audience) {
+				$actor = APContact::getByURL($audience, false);
+				if (($actor['type'] ?? 'Person') == 'Group') {
+					Logger::debug('Group post detected via audience.', ['audience' => $audience, 'actor' => $activity['actor'], 'author' => $activity['author']]);
+					$item['isGroup']    = true;
+					$item['group-link'] = $item['owner-link'] = $audience;
+					$item['owner-id']   = Contact::getIdForURL($audience);
+					break;
+				}
+			}
 		} else {
-			$actor = APContact::getByURL($item['owner-link'], false);
-			$item['isForum'] = ($actor['type'] ?? 'Person') == 'Group';
+			$owner = APContact::getByURL($item['owner-link'], false);
+		}
+
+		if (!$item['isGroup'] && (($owner['type'] ?? 'Person') == 'Group')) {
+			Logger::debug('Group post detected via owner.', ['actor' => $activity['actor'], 'author' => $activity['author']]);
+			$item['isGroup']    = true;
+			$item['group-link'] = $item['owner-link'];
+		} elseif (!empty($item['causer-link'])) {
+			$causer = APContact::getByURL($item['causer-link'], false);
+		}
+
+		if (!$item['isGroup'] && (($causer['type'] ?? 'Person') == 'Group')) {
+			Logger::debug('Group post detected via causer.', ['actor' => $activity['actor'], 'author' => $activity['author'], 'causer' => $item['causer-link']]);
+			$item['isGroup']    = true;
+			$item['group-link'] = $item['causer-link'];
+		}
+
+		if (!empty($item['group-link']) && empty($item['causer-link'])) {
+			$item['causer-link'] = $item['group-link'];
+			$item['causer-id']   = Contact::getIdForURL($item['causer-link']);
 		}
 
 		$item['uri'] = $activity['id'];
@@ -872,6 +904,19 @@ class Processor
 			$item['raw-body'] = $item['body'] = $content;
 		}
 
+		if (!empty($item['author-id']) && ($item['author-id'] == $item['owner-id'])) {
+			foreach (Tag::getFromBody($item['body'], Tag::TAG_CHARACTER[Tag::EXCLUSIVE_MENTION]) as $tag) {
+				$actor = APContact::getByURL($tag[2], false);
+				if (($actor['type'] ?? 'Person') == 'Group') {
+					Logger::debug('Group post detected via exclusive mention.', ['mention' => $actor['url'], 'actor' => $activity['actor'], 'author' => $activity['author']]);
+					$item['isGroup']    = true;
+					$item['group-link'] = $item['owner-link'] = $actor['url'];
+					$item['owner-id']   = Contact::getIdForURL($actor['url']);
+					break;
+				}
+			}
+		}
+
 		self::storeFromBody($item);
 		self::storeTags($item['uri-id'], $activity['tags']);
 
@@ -1059,10 +1104,10 @@ class Processor
 				$item['causer-id'] = ($item['gravity'] == Item::GRAVITY_PARENT) ? $item['owner-id'] : $item['author-id'];
 			}
 
-			if ($item['isForum'] ?? false) {
-				$item['contact-id'] = Contact::getIdForURL($activity['actor'], $receiver);
+			if ($item['isGroup']) {
+				$item['contact-id'] = Contact::getIdForURL($item['group-link'], $receiver);
 			} else {
-				$item['contact-id'] = Contact::getIdForURL($activity['author'], $receiver);
+				$item['contact-id'] = Contact::getIdForURL($item['author-link'], $receiver);
 			}
 
 			if (($receiver != 0) && empty($item['contact-id'])) {
@@ -1075,7 +1120,7 @@ class Processor
 			}
 
 			if (($receiver != 0) && ($item['gravity'] == Item::GRAVITY_PARENT) && !in_array($item['post-reason'], [Item::PR_FOLLOWER, Item::PR_TAG, item::PR_TO, Item::PR_CC, Item::PR_AUDIENCE])) {
-				if (!($item['isForum'] ?? false)) {
+				if (!$item['isGroup']) {
 					if ($item['post-reason'] == Item::PR_BCC) {
 						Logger::info('Top level post via BCC from a non sharer, ignoring', ['uid' => $receiver, 'contact' => $item['contact-id'], 'url' => $item['uri']]);
 						continue;
@@ -1089,16 +1134,16 @@ class Processor
 					}
 				}
 
-				$is_forum = false;
+				$isGroup = false;
 				$user = User::getById($receiver, ['account-type']);
 				if (!empty($user['account-type'])) {
-					$is_forum = ($user['account-type'] == User::ACCOUNT_TYPE_COMMUNITY);
+					$isGroup = ($user['account-type'] == User::ACCOUNT_TYPE_COMMUNITY);
 				}
 
 				if ((DI::pConfig()->get($receiver, 'system', 'accept_only_sharer') == Item::COMPLETION_NONE)
-					&& ((!$is_forum && !($item['isForum'] ?? false) && ($activity['type'] != 'as:Announce'))
+					&& ((!$isGroup && !$item['isGroup'] && ($activity['type'] != 'as:Announce'))
 					|| !Contact::isSharingByURL($activity['actor'], $receiver))) {
-					Logger::info('Actor is a non sharer, is no forum or it is no announce', ['uid' => $receiver, 'actor' => $activity['actor'], 'url' => $item['uri'], 'type' => $activity['type']]);
+					Logger::info('Actor is a non sharer, is no group or it is no announce', ['uid' => $receiver, 'actor' => $activity['actor'], 'url' => $item['uri'], 'type' => $activity['type']]);
 					continue;
 				}
 
@@ -1141,7 +1186,7 @@ class Processor
 		// Store send a follow request for every reshare - but only when the item had been stored
 		if ($stored && ($item['private'] != Item::PRIVATE) && ($item['gravity'] == Item::GRAVITY_PARENT) && !empty($item['author-link']) && ($item['author-link'] != $item['owner-link'])) {
 			$author = APContact::getByURL($item['owner-link'], false);
-			// We send automatic follow requests for reshared messages. (We don't need though for forum posts)
+			// We send automatic follow requests for reshared messages. (We don't need though for group posts)
 			if ($author['type'] != 'Group') {
 				Logger::info('Send follow request', ['uri' => $item['uri'], 'stored' => $stored, 'to' => $item['author-link']]);
 				ActivityPub\Transmitter::sendFollowObject($item['uri'], $item['author-link']);
@@ -1533,6 +1578,7 @@ class Processor
 		$activity['id'] = $object['id'];
 		$activity['to'] = $object['to'] ?? [];
 		$activity['cc'] = $object['cc'] ?? [];
+		$activity['audience'] = $object['audience'] ?? [];
 		$activity['actor'] = $actor;
 		$activity['object'] = $object;
 		$activity['published'] = $published;
@@ -1612,7 +1658,7 @@ class Processor
 		$tags = Receiver::processTags(JsonLD::fetchElementArray($activity['as:object'], 'as:tag') ?? []);
 		if (!empty($tags)) {
 			foreach ($tags as $tag) {
-				if ($tag['type'] != 'Hashtag') {
+				if (($tag['type'] != 'Hashtag') && !strpos($tag['type'], ':Hashtag')) {
 					continue;
 				}
 				$messageTags[] = ltrim(mb_strtolower($tag['name']), '#');
@@ -1848,8 +1894,8 @@ class Processor
 	 */
 	public static function ReportAccount(array $activity)
 	{
-		$account_id = Contact::getIdForURL($activity['object_id']);
-		if (empty($account_id)) {
+		$account = Contact::getByURL($activity['object_id'], null, ['id', 'gsid']);
+		if (empty($account)) {
 			Logger::info('Unknown account', ['activity' => $activity]);
 			Queue::remove($activity);
 			return;
@@ -1870,10 +1916,10 @@ class Processor
 			}
 		}
 
-		$report = DI::reportFactory()->createFromReportsRequest($reporter_id, $account_id, $activity['content'], null, '', false, $uri_ids);
+		$report = DI::reportFactory()->createFromReportsRequest(System::getRules(true), $reporter_id, $account['id'], $account['gsid'], $activity['content'], 'other', false, $uri_ids);
 		DI::report()->save($report);
 
-		Logger::info('Stored report', ['reporter' => $reporter_id, 'account_id' => $account_id, 'comment' => $activity['content'], 'object_ids' => $activity['object_ids']]);
+		Logger::info('Stored report', ['reporter' => $reporter_id, 'account' => $account, 'comment' => $activity['content'], 'object_ids' => $activity['object_ids']]);
 	}
 
 	/**

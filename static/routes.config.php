@@ -89,12 +89,20 @@ $apiRoutes = [
 		'/direct_messages_setseen[.{extension:json|xml|rss|atom}]' => [Module\Api\Friendica\DirectMessages\Setseen::class, [        R::POST]],
 		'/direct_messages_search[.{extension:json|xml|rss|atom}]'  => [Module\Api\Friendica\DirectMessages\Search ::class, [R::GET         ]],
 		'/events[.{extension:json|xml|rss|atom}]'                  => [Module\Api\Friendica\Events\Index::class,           [R::GET         ]],
-                '/event_create[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Events\Create::class,          [        R::POST]],
-                '/event_delete[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Events\Delete::class,          [        R::POST]],
-		'/group_show[.{extension:json|xml|rss|atom}]'              => [Module\Api\Friendica\Group\Show::class,             [R::GET         ]],
-		'/group_create[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Group\Create::class,           [        R::POST]],
-		'/group_delete[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Group\Delete::class,           [        R::POST]],
-		'/group_update[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Group\Update::class,           [        R::POST]],
+		'/event_create[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Events\Create::class,          [        R::POST]],
+		'/event_delete[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Events\Delete::class,          [        R::POST]],
+		'/circle_show[.{extension:json|xml|rss|atom}]'             => [Module\Api\Friendica\Circle\Show::class,            [R::GET         ]],
+		'/circle_create[.{extension:json|xml|rss|atom}]'           => [Module\Api\Friendica\Circle\Create::class,          [        R::POST]],
+		'/circle_delete[.{extension:json|xml|rss|atom}]'           => [Module\Api\Friendica\Circle\Delete::class,          [        R::POST]],
+		'/circle_update[.{extension:json|xml|rss|atom}]'           => [Module\Api\Friendica\Circle\Update::class,          [        R::POST]],
+
+		// Backward compatibility
+		// @deprecated
+		'/group_show[.{extension:json|xml|rss|atom}]'              => [Module\Api\Friendica\Circle\Show::class,            [R::GET         ]],
+		'/group_create[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Circle\Create::class,          [        R::POST]],
+		'/group_delete[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Circle\Delete::class,          [        R::POST]],
+		'/group_update[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Circle\Update::class,          [        R::POST]],
+
 		'/profile/show[.{extension:json|xml|rss|atom}]'            => [Module\Api\Friendica\Profile\Show::class,           [R::GET         ]],
 		'/photoalbums[.{extension:json|xml|rss|atom}]'             => [Module\Api\Friendica\Photoalbum\Index::class,       [R::GET         ]],
 		'/photoalbum[.{extension:json|xml|rss|atom}]'              => [Module\Api\Friendica\Photoalbum\Show::class,        [R::GET         ]],
@@ -441,19 +449,19 @@ return [
 	'/follow_confirm'       => [Module\FollowConfirm::class,         [R::GET, R::POST]],
 	'/followers/{nickname}' => [Module\ActivityPub\Followers::class, [R::GET]],
 	'/following/{nickname}' => [Module\ActivityPub\Following::class, [R::GET]],
-	'/friendica[/json]'     => [Module\Friendica::class,             [R::GET]],
+	'/friendica[/{format:json}]' => [Module\Friendica::class,        [R::GET]],
 	'/friendica/inbox'      => [Module\ActivityPub\Inbox::class,     [R::GET, R::POST]],
 
 	'/fsuggest/{contact:\d+}' => [Module\FriendSuggest::class,  [R::GET, R::POST]],
 
-	'/group'              => [
-		'[/]'                        => [Module\Group::class, [R::GET, R::POST]],
-		'/{group:\d+}'               => [Module\Group::class, [R::GET, R::POST]],
-		'/none'                      => [Module\Group::class, [R::GET, R::POST]],
-		'/new'                       => [Module\Group::class, [R::GET, R::POST]],
-		'/drop/{group:\d+}'          => [Module\Group::class, [R::GET, R::POST]],
-		'/{group:\d+}/{contact:\d+}' => [Module\Group::class, [R::GET, R::POST]],
-		'/{group:\d+}/{command:add|remove}/{contact:\d+}'    => [Module\Group::class, [R::GET, R::POST]],
+	'/circle'              => [
+		'[/]'                         => [Module\Circle::class, [R::GET, R::POST]],
+		'/{circle:\d+}'               => [Module\Circle::class, [R::GET, R::POST]],
+		'/none'                       => [Module\Circle::class, [R::GET, R::POST]],
+		'/new'                        => [Module\Circle::class, [R::GET, R::POST]],
+		'/drop/{circle:\d+}'          => [Module\Circle::class, [R::GET, R::POST]],
+		'/{circle:\d+}/{contact:\d+}' => [Module\Circle::class, [R::GET, R::POST]],
+		'/{circle:\d+}/{command:add|remove}/{contact:\d+}' => [Module\Circle::class, [R::GET, R::POST]],
 	],
 	'/hashtag'                    => [Module\Hashtag::class,           [R::GET]],
 	'/help[/{doc:.+}]'            => [Module\Help::class,              [R::GET]],
@@ -500,6 +508,8 @@ return [
 		'/item/delete'          => [Module\Moderation\Item\Delete::class, [R::GET, R::POST]],
 		'/item/source[/{guid}]' => [Module\Moderation\Item\Source::class, [R::GET, R::POST]],
 
+		'/report/create' => [Module\Moderation\Report\Create::class, [R::GET, R::POST]],
+
 		'/users[/{action}/{uid}]'         => [Module\Moderation\Users\Index::class,   [R::GET, R::POST]],
 		'/users/active[/{action}/{uid}]'  => [Module\Moderation\Users\Active::class,  [R::GET, R::POST]],
 		'/users/pending[/{action}/{uid}]' => [Module\Moderation\Users\Pending::class, [R::GET, R::POST]],
@@ -511,7 +521,7 @@ return [
 	'/newmember'          => [Module\Welcome::class,         [R::GET]],
 	'/nodeinfo/1.0'       => [Module\NodeInfo110::class,     [R::GET]],
 	'/nodeinfo/2.0'       => [Module\NodeInfo120::class,     [R::GET]],
-	'/nogroup'            => [Module\Group::class,           [R::GET]],
+	'/nocircle'           => [Module\Circle::class,          [R::GET]],
 
 	'/noscrape' => [
 		'/{nick}'         => [Module\NoScrape::class, [R::GET]],
@@ -629,6 +639,10 @@ return [
 	],
 
 	'/settings' => [
+		'/server' => [
+			'[/]'                  => [Module\Settings\Server\Index::class,  [R::GET, R::POST]],
+			'/{gsid:\d+}/{action}' => [Module\Settings\Server\Action::class, [R::GET, R::POST]],
+		],
 		'[/]'         => [Module\Settings\Account::class,               [R::GET, R::POST]],
 		'/account' => [
 			'[/]'     => [Module\Settings\Account::class,               [R::GET, R::POST]],
@@ -659,8 +673,8 @@ return [
 	'/network' => [
 		'[/]'                         => [Module\Conversation\Network::class, [R::GET]],
 		'/archive/{from:\d\d\d\d-\d\d-\d\d}[/{to:\d\d\d\d-\d\d-\d\d}]' => [Module\Conversation\Network::class, [R::GET]],
-		'/forum/{contact_id:\d+}'     => [Module\Conversation\Network::class, [R::GET]],
-		'/group/{group_id:\d+}'       => [Module\Conversation\Network::class, [R::GET]],
+		'/group/{contact_id:\d+}'     => [Module\Conversation\Network::class, [R::GET]],
+		'/circle/{circle_id:\d+}'     => [Module\Conversation\Network::class, [R::GET]],
 	],
 
 	'/randprof'                      => [Module\RandomProfile::class,         [R::GET]],
@@ -679,8 +693,8 @@ return [
 	'/update_network' => [
 		'[/]'                        => [Module\Update\Network::class, [R::GET]],
 		'/archive/{from:\d\d\d\d-\d\d-\d\d}[/{to:\d\d\d\d-\d\d-\d\d}]' => [Module\Update\Network::class, [R::GET]],
-		'/forum/{contact_id:\d+}'    => [Module\Update\Network::class, [R::GET]],
-		'/group/{group_id:\d+}'      => [Module\Update\Network::class, [R::GET]],
+		'/group/{contact_id:\d+}'    => [Module\Update\Network::class, [R::GET]],
+		'/circle/{circle_id:\d+}'    => [Module\Update\Network::class, [R::GET]],
 	],
 
 	'/update_profile'                => [Module\Update\Profile::class,        [R::GET]],

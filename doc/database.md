@@ -30,8 +30,8 @@ Database Tables
 | [fetch-entry](help/database/db_fetch-entry) |  |
 | [fetched-activity](help/database/db_fetched-activity) | Id of fetched activities |
 | [fsuggest](help/database/db_fsuggest) | friend suggestion stuff |
-| [group](help/database/db_group) | privacy groups, group info |
-| [group_member](help/database/db_group_member) | privacy groups, member info |
+| [group](help/database/db_group) | privacy circles, circle info |
+| [group_member](help/database/db_group_member) | privacy circles, member info |
 | [gserver](help/database/db_gserver) | Global servers |
 | [gserver-tag](help/database/db_gserver-tag) | Tags that the server has subscribed |
 | [hook](help/database/db_hook) | addon hook registry |
@@ -77,7 +77,8 @@ Database Tables
 | [push_subscriber](help/database/db_push_subscriber) | Used for OStatus: Contains feed subscribers |
 | [register](help/database/db_register) | registrations requiring admin approval |
 | [report](help/database/db_report) |  |
-| [report-post](help/database/db_report-post) |  |
+| [report-post](help/database/db_report-post) | Individual posts attached to a moderation report |
+| [report-rule](help/database/db_report-rule) | Terms of service rule lines relevant to a moderation report |
 | [search](help/database/db_search) |  |
 | [session](help/database/db_session) | web session storage |
 | [storage](help/database/db_storage) | Data stored by Database storage backend |
@@ -85,6 +86,7 @@ Database Tables
 | [tag](help/database/db_tag) | tags and mentions |
 | [user](help/database/db_user) | The local users |
 | [user-contact](help/database/db_user-contact) | User specific public contact data |
+| [user-gserver](help/database/db_user-gserver) | User settings about remote servers |
 | [userd](help/database/db_userd) | Deleted usernames |
 | [verb](help/database/db_verb) | Activity Verbs |
 | [worker-ipc](help/database/db_worker-ipc) | Inter process communication between the frontend and the worker |

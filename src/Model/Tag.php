@@ -50,7 +50,7 @@ class Tag
 	 */
 	const IMPLICIT_MENTION  = 8;
 	/**
-	 * An exclusive mention transmits the post only to the target account without transmitting it to the followers, usually a forum.
+	 * An exclusive mention transmits the post only to the target account without transmitting it to the followers, usually a group.
 	 */
 	const EXCLUSIVE_MENTION = 9;
 
@@ -487,7 +487,7 @@ class Tag
 	 *
 	 * @return boolean
 	 */
-	public static function isMentioned(int $uriId, string $url, array $type = [self::MENTION, self::EXCLUSIVE_MENTION]): bool
+	public static function isMentioned(int $uriId, string $url, array $type = [self::MENTION, self::EXCLUSIVE_MENTION, self::AUDIENCE]): bool
 	{
 		$tags = self::getByURIId($uriId, $type);
 		foreach ($tags as $tag) {

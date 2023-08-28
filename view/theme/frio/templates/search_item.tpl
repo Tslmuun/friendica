@@ -1,4 +1,8 @@
 <div id="item-{{$item.guid}}" class="item-{{$item.id}}">
+	<span class="commented" style="display: none;">{{$item.commented}}</span>
+	<span class="received" style="display: none;">{{$item.received}}</span>
+	<span class="created" style="display: none;">{{$item.created_date}}</span>
+	<span class="uriid" style="display: none;">{{$item.uriid}}</span>
 	<div class="wall-item-container panel-body{{$item.indent}} {{$item.shiny}} {{$item.previewing}}">
 		<div class="media">
 			{{* Put additional actions in a top-right dropdown menu *}}
@@ -245,7 +249,7 @@
 
 						{{if $item.drop && $item.drop.dropping}}
 							<li role="menuitem">
-								<a class="btn-link navicon delete" href="javascript:dropItem('item/drop/{{$item.id}}/{{$item.return}}', 'item-{{$item.guid}}');" title="{{$item.drop.delete}}"><i class="fa fa-trash" aria-hidden="true"></i> {{$item.drop.delete}}</a>
+								<a class="btn-link navicon delete" href="javascript:dropItem('item/drop/{{$item.id}}', 'item-{{$item.guid}}');" title="{{$item.drop.label}}"><i class="fa fa-trash" aria-hidden="true"></i> {{$item.drop.label}}</a>
 							</li>
 							{{/if}}
 						</ul>

@@ -45,7 +45,7 @@ $is_singleuser_class = $is_singleuser ? "is-singleuser" : "is-not-singleuser";
 	<head>
 		<title><?php if (!empty($page['title'])) echo $page['title'] ?></title>
 		<meta request="<?php echo htmlspecialchars($_REQUEST['pagename'] ?? '') ?>">
-		<script  type="text/javascript">var baseurl = "<?php echo DI::baseUrl(); ?>";</script>
+		<script  type="text/javascript">var baseurl = "<?php echo (string)DI::baseUrl(); ?>";</script>
 		<script type="text/javascript">var frio = "<?php echo 'view/theme/frio'; ?>";</script>
 <?php
 		// Because we use minimal for modals the header and the included js stuff should be only loaded
@@ -137,12 +137,12 @@ $is_singleuser_class = $is_singleuser ? "is-singleuser" : "is-not-singleuser";
 						';
 				} else {
 					echo '
-					<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12" id="content" style="margin-top:50px;">';
+					<section class="col-lg-12 col-md-12 col-sm-12 col-xs-12" id="content" style="margin-top:50px;">';
 						if (!empty($page['content'])) {
 							echo $page['content'];
 						}
 						echo '
-					</div>
+					</section>
 					';
 				}
 ?>

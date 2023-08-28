@@ -57,6 +57,7 @@ class Protocol
 	const TWITTER   = 'twit';    // Twitter
 	const DISCOURSE = 'dscs';    // Discourse
 	const TUMBLR    = 'tmbl';    // Tumblr
+	const BLUESKY   = 'bsky';    // Bluesky
 
 	// Dead protocols
 	const APPNET    = 'apdn';    // app.net - Dead protocol
@@ -315,7 +316,12 @@ class Protocol
 	 */
 	public static function supportsProbe($protocol): bool
 	{
-		if (in_array($protocol, self::NATIVE_SUPPORT)) {
+		// "Mail" can only be probed for a specific user in a specific condition, so we are ignoring it here.
+		if ($protocol == self::MAIL) {
+			return false;
+		}
+
+		if (in_array($protocol, array_merge(self::NATIVE_SUPPORT, [self::ZOT, self::PHANTOM]))) {
 			return true;
 		}
 

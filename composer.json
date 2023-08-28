@@ -77,6 +77,12 @@
 		"npm-asset/textcomplete": "^0.18.2",
 		"npm-asset/typeahead.js": "^0.11.1"
 	},
+	"suggest": {
+		"ext-imagick": "For faster image processing",
+		"ext-redis": "To use Redis as a locking or caching provider",
+		"ext-pdo": "To use PDO as a database driver, has priority over mysqli unless database.disable_pdo is set",
+		"ext-mysqli": "To use mysqli as a databse driver"
+	},
 	"repositories": [
 		{
 			"type": "vcs",
@@ -134,6 +140,7 @@
 	"scripts": {
 		"test": "phpunit",
 		"lint": "find . -name \\*.php -not -path './vendor/*' -not -path './view/asset/*' -print0 | xargs -0 -n1 php -l",
+		"docker:translate": "docker run --rm -v $PWD:/data -w /data friendicaci/transifex bin/run_xgettext.sh",
 		"cs:install": "@composer install --working-dir=bin/dev/php-cs-fixer",
 		"cs:check": [
 			"@cs:install",

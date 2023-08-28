@@ -80,7 +80,7 @@ as the value of $top_child_total (this is done at the end of this file)
 				</a>
 			</div>
 
-			{{* The little overlay avatar picture if someone is posting directly to a wall or a forum *}}
+			{{* The little overlay avatar picture if someone is posting directly to a wall or a group *}}
 			{{if $item.owner_url}}
 			<div aria-hidden="true" class="contact-photo-wrapper mframe wwto" id="wall-item-ownerphoto-wrapper-{{$item.id}}">
 				<a href="{{$item.owner_url}}" target="redir" title="{{$item.olinktitle}}" class="contact-photo-link" id="wall-item-ownerphoto-link-{{$item.id}}">
@@ -390,18 +390,33 @@ as the value of $top_child_total (this is done at the end of this file)
 
                                         {{if $item.drop && $item.drop.dropping}}
                                         <li role="menuitem">
-                                                <a class="btn-link navicon delete" href="javascript:dropItem('item/drop/{{$item.id}}/{{$item.return}}', 'item-{{$item.guid}}');" title="{{$item.drop.delete}}"><i class="fa fa-trash" aria-hidden="true"></i> {{$item.drop.delete}}</a>
+                                                <a class="btn-link navicon delete" href="javascript:dropItem('item/drop/{{$item.id}}', 'item-{{$item.guid}}');" title="{{$item.drop.label}}"><i class="fa fa-trash" aria-hidden="true"></i> {{$item.drop.label}}</a>
                                         </li>
                                         {{/if}}
 
                                         {{if $item.block}}
                                         <li role="menuitem">
-                                                <a class="btn-link navicon block" href="javascript:blockAuthor('item/block/{{$item.id}}/{{$item.return}}', 'item-{{$item.guid}}');" title="{{$item.block.block}}"><i class="fa fa-ban" aria-hidden="true"></i> {{$item.block.block}}</a>
+                                                <a class="btn-link navicon block" href="javascript:blockAuthor('item/block/{{$item.id}}', 'item-{{$item.guid}}');" title="{{$item.block.label}}"><i class="fa fa-ban" aria-hidden="true"></i> {{$item.block.label}}</a>
                                         </li>
                                         {{/if}}
                                         {{if $item.ignore_author}}
                                         <li role="menuitem">
-                                                <a class="btn-link navicon ignore" href="javascript:ignoreAuthor('item/ignore/{{$item.id}}/{{$item.return}}', 'item-{{$item.guid}}');" title="{{$item.ignore_author.ignore}}"><i class="fa fa-ban" aria-hidden="true"></i> {{$item.ignore_author.ignore}}</a>
+                                                <a class="btn-link navicon ignore" href="javascript:ignoreAuthor('item/ignore/{{$item.id}}', 'item-{{$item.guid}}');" title="{{$item.ignore_author.label}}"><i class="fa fa-eye-slash" aria-hidden="true"></i> {{$item.ignore_author.label}}</a>
+                                        </li>
+                                        {{/if}}
+                                        {{if $item.collapse}}
+                                        <li role="menuitem">
+                                                <a class="btn-link navicon collapse" href="javascript:collapseAuthor('item/collapse/{{$item.id}}', 'item-{{$item.guid}}');" title="{{$item.collapse.label}}"><i class="fa fa-minus-square" aria-hidden="true"></i> {{$item.collapse.label}}</a>
+                                        </li>
+                                        {{/if}}
+	                                    {{if $item.ignore_server}}
+                                        <li role="menuitem">
+                                                <a class="btn-link navicon ignoreServer" href="javascript:ignoreServer('settings/server/{{$item.author_gsid}}/ignore', 'item-{{$item.guid}}');" title="{{$item.ignore_server.label}}"><i class="fa fa-eye-slash" aria-hidden="true"></i> {{$item.ignore_server.label}}</a>
+                                        </li>
+                                        {{/if}}
+                                        {{if $item.report}}
+                                        <li role="menuitem">
+                                                <a class="btn-link navicon ignore" href="{{$item.report.href}}"><i class="fa fa-flag" aria-hidden="true"></i> {{$item.report.label}}</a>
                                         </li>
                                         {{/if}}
                                     </ul>
@@ -554,7 +569,7 @@ as the value of $top_child_total (this is done at the end of this file)
 
 							{{if $item.drop && $item.drop.dropping}}
 								<li role="menuitem">
-								<a class="btn-link navicon delete" href="javascript:dropItem('item/drop/{{$item.id}}/{{$item.return}}', 'item-{{$item.guid}}');" title="{{$item.drop.delete}}"><i class="fa fa-trash" aria-hidden="true"></i> {{$item.drop.delete}}</a>
+								<a class="btn-link navicon delete" href="javascript:dropItem('item/drop/{{$item.id}}', 'item-{{$item.guid}}');" title="{{$item.drop.label}}"><i class="fa fa-trash" aria-hidden="true"></i> {{$item.drop.label}}</a>
 							</li>
 							{{/if}}
 						</ul>

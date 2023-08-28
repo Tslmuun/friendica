@@ -23,7 +23,7 @@ namespace Friendica\Module\Profile;
 
 use Friendica\App;
 use Friendica\Content\Feature;
-use Friendica\Content\ForumManager;
+use Friendica\Content\GroupManager;
 use Friendica\Content\Nav;
 use Friendica\Content\Text\BBCode;
 use Friendica\Core\Config\Capability\IManageConfigValues;
@@ -84,7 +84,7 @@ class Profile extends BaseProfile
 			$user = $this->database->selectFirst('user', ['uid'], ['nickname' => $this->parameters['nickname'] ?? '', 'account_removed' => false]);
 			if ($user) {
 				try {
-					$data = ActivityPub\Transmitter::getProfile($user['uid']);
+					$data = ActivityPub\Transmitter::getProfile($user['uid'], ActivityPub::isAcceptedRequester($user['uid']));
 					header('Access-Control-Allow-Origin: *');
 					header('Cache-Control: max-age=23200, stale-while-revalidate=23200');
 					System::jsonExit($data, 'application/activity+json');
@@ -254,12 +254,12 @@ class Profile extends BaseProfile
 			);
 		}
 
-		//show subscribed forum if it is enabled in the usersettings
+		//show subscribed group if it is enabled in the usersettings
 		if (Feature::isEnabled($profile['uid'], 'forumlist_profile')) {
 			$custom_fields += self::buildField(
-				'forumlist',
-				$this->t('Forums:'),
-				ForumManager::profileAdvanced($profile['uid'])
+				'group_list',
+				$this->t('Groups:'),
+				GroupManager::profileAdvanced($profile['uid'])
 			);
 		}
 

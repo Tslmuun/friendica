@@ -25,6 +25,7 @@ use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use Friendica\App;
+use Friendica\Contact\LocalRelationship\Entity\LocalRelationship;
 use Friendica\Content\PageInfo;
 use Friendica\Content\Text\BBCode;
 use Friendica\Content\Text\HTML;
@@ -92,7 +93,9 @@ class Feed
 		$doc = new DOMDocument();
 		@$doc->loadXML($xml);
 		$xpath = new DOMXPath($doc);
+
 		$xpath->registerNamespace('atom', ActivityNamespace::ATOM1);
+		$xpath->registerNamespace('atom03', ActivityNamespace::ATOM03);
 		$xpath->registerNamespace('dc', 'http://purl.org/dc/elements/1.1/');
 		$xpath->registerNamespace('content', 'http://purl.org/rss/1.0/modules/content/');
 		$xpath->registerNamespace('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#');
@@ -101,6 +104,7 @@ class Feed
 		$xpath->registerNamespace('poco', ActivityNamespace::POCO);
 
 		$author = [];
+		$atomns = 'atom';
 		$entries = null;
 		$protocol = Conversation::PARCEL_UNKNOWN;
 
@@ -116,10 +120,22 @@ class Feed
 			$entries = $xpath->query('/rdf:RDF/rss:item');
 		}
 
+		if ($xpath->query('/opml')->length > 0) {
+			$protocol = Conversation::PARCEL_OPML;
+			$author['author-name'] = XML::getFirstNodeValue($xpath, '/opml/head/title/text()');
+			$entries = $xpath->query('/opml/body/outline');
+		}
+
 		// Is it Atom?
 		if ($xpath->query('/atom:feed')->length > 0) {
 			$protocol = Conversation::PARCEL_ATOM;
-			$alternate = XML::getFirstAttributes($xpath, "atom:link[@rel='alternate']");
+		} elseif ($xpath->query('/atom03:feed')->length > 0) {
+			$protocol = Conversation::PARCEL_ATOM03;
+			$atomns = 'atom03';
+		}
+
+		if (in_array($protocol, [Conversation::PARCEL_ATOM, Conversation::PARCEL_ATOM03])) {
+			$alternate = XML::getFirstAttributes($xpath, $atomns . ":link[@rel='alternate']");
 			if (is_object($alternate)) {
 				foreach ($alternate as $attribute) {
 					if ($attribute->name == 'href') {
@@ -129,7 +145,7 @@ class Feed
 			}
 
 			if (empty($author['author-link'])) {
-				$self = XML::getFirstAttributes($xpath, "atom:link[@rel='self']");
+				$self = XML::getFirstAttributes($xpath, $atomns . ":link[@rel='self']");
 				if (is_object($self)) {
 					foreach ($self as $attribute) {
 						if ($attribute->name == 'href') {
@@ -140,50 +156,50 @@ class Feed
 			}
 
 			if (empty($author['author-link'])) {
-				$author['author-link'] = XML::getFirstNodeValue($xpath, '/atom:feed/atom:id/text()');
+				$author['author-link'] = XML::getFirstNodeValue($xpath, '/' . $atomns . ':feed/' . $atomns . ':id/text()');
 			}
-			$author['author-avatar'] = XML::getFirstNodeValue($xpath, '/atom:feed/atom:logo/text()');
+			$author['author-avatar'] = XML::getFirstNodeValue($xpath, '/' . $atomns . ':feed/' . $atomns . ':logo/text()');
 
-			$author['author-name'] = XML::getFirstNodeValue($xpath, '/atom:feed/atom:title/text()');
+			$author['author-name'] = XML::getFirstNodeValue($xpath, '/' . $atomns . ':feed/' . $atomns . ':title/text()');
 
 			if (empty($author['author-name'])) {
-				$author['author-name'] = XML::getFirstNodeValue($xpath, '/atom:feed/atom:subtitle/text()');
+				$author['author-name'] = XML::getFirstNodeValue($xpath, '/' . $atomns . ':feed/' . $atomns . ':subtitle/text()');
 			}
 
 			if (empty($author['author-name'])) {
-				$author['author-name'] = XML::getFirstNodeValue($xpath, '/atom:feed/atom:author/atom:name/text()');
+				$author['author-name'] = XML::getFirstNodeValue($xpath, '/' . $atomns . ':feed/' . $atomns . ':author/' . $atomns . ':name/text()');
 			}
 
-			$value = XML::getFirstNodeValue($xpath, 'atom:author/poco:displayName/text()');
+			$value = XML::getFirstNodeValue($xpath, '' . $atomns . ':author/poco:displayName/text()');
 			if ($value != '') {
 				$author['author-name'] = $value;
 			}
 
 			if ($dryRun) {
-				$author['author-id'] = XML::getFirstNodeValue($xpath, '/atom:feed/atom:author/atom:id/text()');
+				$author['author-id'] = XML::getFirstNodeValue($xpath, '/' . $atomns . ':feed/' . $atomns . ':author/' . $atomns . ':id/text()');
 
 				// See https://tools.ietf.org/html/rfc4287#section-3.2.2
-				$value = XML::getFirstNodeValue($xpath, 'atom:author/atom:uri/text()');
+				$value = XML::getFirstNodeValue($xpath, $atomns . ':author/' . $atomns . ':uri/text()');
 				if ($value != '') {
 					$author['author-link'] = $value;
 				}
 
-				$value = XML::getFirstNodeValue($xpath, 'atom:author/poco:preferredUsername/text()');
+				$value = XML::getFirstNodeValue($xpath, $atomns . ':author/poco:preferredUsername/text()');
 				if ($value != '') {
 					$author['author-nick'] = $value;
 				}
 
-				$value = XML::getFirstNodeValue($xpath, 'atom:author/poco:address/poco:formatted/text()');
+				$value = XML::getFirstNodeValue($xpath, $atomns . ':author/poco:address/poco:formatted/text()');
 				if ($value != '') {
 					$author['author-location'] = $value;
 				}
 
-				$value = XML::getFirstNodeValue($xpath, 'atom:author/poco:note/text()');
+				$value = XML::getFirstNodeValue($xpath, $atomns . ':author/poco:note/text()');
 				if ($value != '') {
 					$author['author-about'] = $value;
 				}
 
-				$avatar = XML::getFirstAttributes($xpath, "atom:author/atom:link[@rel='avatar']");
+				$avatar = XML::getFirstAttributes($xpath, $atomns . ":author/' . $atomns . ':link[@rel='avatar']");
 				if (is_object($avatar)) {
 					foreach ($avatar as $attribute) {
 						if ($attribute->name == 'href') {
@@ -193,11 +209,11 @@ class Feed
 				}
 			}
 
-			$author['edited'] = $author['created'] = XML::getFirstNodeValue($xpath, '/atom:feed/atom:updated/text()');
+			$author['edited'] = $author['created'] = XML::getFirstNodeValue($xpath, '/' . $atomns . ':feed/' . $atomns . ':updated/text()');
 
-			$author['app'] = XML::getFirstNodeValue($xpath, '/atom:feed/atom:generator/text()');
+			$author['app'] = XML::getFirstNodeValue($xpath, '/' . $atomns . ':feed/' . $atomns . ':generator/text()');
 
-			$entries = $xpath->query('/atom:feed/atom:entry');
+			$entries = $xpath->query('/' . $atomns . ':feed/' . $atomns . ':entry');
 		}
 
 		// Is it RSS?
@@ -293,16 +309,51 @@ class Feed
 			$entry = $entries->item($i);
 
 			$item = array_merge($header, $author);
+			$body = '';
 
-			$alternate = XML::getFirstAttributes($xpath, "atom:link[@rel='alternate']", $entry);
+			$alternate = XML::getFirstAttributes($xpath, $atomns . ":link[@rel='alternate']", $entry);
 			if (!is_object($alternate)) {
-				$alternate = XML::getFirstAttributes($xpath, 'atom:link', $entry);
+				$alternate = XML::getFirstAttributes($xpath, $atomns . ':link', $entry);
 			}
 			if (is_object($alternate)) {
 				foreach ($alternate as $attribute) {
 					if ($attribute->name == 'href') {
 						$item['plink'] = $attribute->textContent;
 					}
+				}
+			}
+
+			if ($entry->nodeName == 'outline') {
+				$isrss = false;
+				$plink = '';
+				$uri = '';
+				foreach ($entry->attributes as $attribute) {
+					switch ($attribute->nodeName) {
+						case 'title':
+							$item['title'] = $attribute->nodeValue;
+							break;
+
+						case 'text':
+							$body = $attribute->nodeValue;
+							break;
+
+						case 'htmlUrl':
+							$plink = $attribute->nodeValue;
+							break;
+
+						case 'xmlUrl':
+							$uri = $attribute->nodeValue;
+							break;
+
+						case 'type':
+							$isrss = $attribute->nodeValue == 'rss';
+							break;
+					}
+				}
+				$item['plink'] = $plink ?: $uri;
+				$item['uri'] = $uri ?: $plink;
+				if (!$isrss || empty($item['uri'])) {
+					continue;
 				}
 			}
 
@@ -317,7 +368,9 @@ class Feed
 			// Add the base path if missing
 			$item['plink'] = Network::addBasePath($item['plink'], $basepath);
 
-			$item['uri'] = XML::getFirstNodeValue($xpath, 'atom:id/text()', $entry);
+			if (empty($item['uri'])) {
+				$item['uri'] = XML::getFirstNodeValue($xpath, $atomns . ':id/text()', $entry);
+			}
 
 			$guid = XML::getFirstNodeValue($xpath, 'guid/text()', $entry);
 			if (!empty($guid)) {
@@ -339,7 +392,9 @@ class Feed
 				Logger::notice('Item URL couldn\'t get expanded', ['url' => $item['plink'], 'exception' => $exception]);
 			}
 
-			$item['title'] = XML::getFirstNodeValue($xpath, 'atom:title/text()', $entry);
+			if (empty($item['title'])) {
+				$item['title'] = XML::getFirstNodeValue($xpath, $atomns . ':title/text()', $entry);
+			}
 
 			if (empty($item['title'])) {
 				$item['title'] = XML::getFirstNodeValue($xpath, 'title/text()', $entry);
@@ -355,7 +410,7 @@ class Feed
 
 			$item['title'] = html_entity_decode($item['title'], ENT_QUOTES, 'UTF-8');
 
-			$published = XML::getFirstNodeValue($xpath, 'atom:published/text()', $entry);
+			$published = XML::getFirstNodeValue($xpath, $atomns . ':published/text()', $entry);
 
 			if (empty($published)) {
 				$published = XML::getFirstNodeValue($xpath, 'pubDate/text()', $entry);
@@ -365,7 +420,7 @@ class Feed
 				$published = XML::getFirstNodeValue($xpath, 'dc:date/text()', $entry);
 			}
 
-			$updated = XML::getFirstNodeValue($xpath, 'atom:updated/text()', $entry);
+			$updated = XML::getFirstNodeValue($xpath, $atomns . ':updated/text()', $entry);
 
 			if (empty($updated) && !empty($published)) {
 				$updated = $published;
@@ -401,7 +456,7 @@ class Feed
 			$creator = XML::getFirstNodeValue($xpath, 'author/text()', $entry);
 
 			if (empty($creator)) {
-				$creator = XML::getFirstNodeValue($xpath, 'atom:author/atom:name/text()', $entry);
+				$creator = XML::getFirstNodeValue($xpath, $atomns . ':author/' . $atomns . ':name/text()', $entry);
 			}
 
 			if (empty($creator)) {
@@ -424,33 +479,35 @@ class Feed
 
 			$attachments = [];
 
-			$enclosures = $xpath->query("enclosure|atom:link[@rel='enclosure']", $entry);
-			foreach ($enclosures as $enclosure) {
-				$href = '';
-				$length = null;
-				$type = null;
+			$enclosures = $xpath->query("enclosure|$atomns:link[@rel='enclosure']", $entry);
+			if (!empty($enclosures)) {
+				foreach ($enclosures as $enclosure) {
+					$href = '';
+					$length = null;
+					$type = null;
 
-				foreach ($enclosure->attributes as $attribute) {
-					if (in_array($attribute->name, ['url', 'href'])) {
-						$href = $attribute->textContent;
-					} elseif ($attribute->name == 'length') {
-						$length = (int)$attribute->textContent;
-					} elseif ($attribute->name == 'type') {
-						$type = $attribute->textContent;
+					foreach ($enclosure->attributes as $attribute) {
+						if (in_array($attribute->name, ['url', 'href'])) {
+							$href = $attribute->textContent;
+						} elseif ($attribute->name == 'length') {
+							$length = (int)$attribute->textContent;
+						} elseif ($attribute->name == 'type') {
+							$type = $attribute->textContent;
+						}
 					}
-				}
 
-				if (!empty($href)) {
-					$attachment = ['uri-id' => -1, 'type' => Post\Media::UNKNOWN, 'url' => $href, 'mimetype' => $type, 'size' => $length];
+					if (!empty($href)) {
+						$attachment = ['uri-id' => -1, 'type' => Post\Media::UNKNOWN, 'url' => $href, 'mimetype' => $type, 'size' => $length];
 
-					$attachment = Post\Media::fetchAdditionalData($attachment);
+						$attachment = Post\Media::fetchAdditionalData($attachment);
 
-					// By now we separate the visible media types (audio, video, image) from the rest
-					// In the future we should try to avoid the DOCUMENT type and only use the real one - but not in the RC phase.
-					if (!in_array($attachment['type'], [Post\Media::AUDIO, Post\Media::IMAGE, Post\Media::VIDEO])) {
-						$attachment['type'] = Post\Media::DOCUMENT;
+						// By now we separate the visible media types (audio, video, image) from the rest
+						// In the future we should try to avoid the DOCUMENT type and only use the real one - but not in the RC phase.
+						if (!in_array($attachment['type'], [Post\Media::AUDIO, Post\Media::IMAGE, Post\Media::VIDEO])) {
+							$attachment['type'] = Post\Media::DOCUMENT;
+						}
+						$attachments[] = $attachment;
 					}
-					$attachments[] = $attachment;
 				}
 			}
 
@@ -460,13 +517,15 @@ class Feed
 				$taglist[] = $category->nodeValue;
 			}
 
-			$body = trim(XML::getFirstNodeValue($xpath, 'atom:content/text()', $entry));
+			if (empty($body)) {
+				$body = trim(XML::getFirstNodeValue($xpath, $atomns . ':content/text()', $entry));
+			}
 
 			if (empty($body)) {
 				$body = trim(XML::getFirstNodeValue($xpath, 'content:encoded/text()', $entry));
 			}
 
-			$summary = trim(XML::getFirstNodeValue($xpath, 'atom:summary/text()', $entry));
+			$summary = trim(XML::getFirstNodeValue($xpath, $atomns . ':summary/text()', $entry));
 
 			if (empty($summary)) {
 				$summary = trim(XML::getFirstNodeValue($xpath, 'description/text()', $entry));
@@ -508,8 +567,10 @@ class Feed
 				continue;
 			}
 
+			$fetch_further_information = $contact['fetch_further_information'] ?? LocalRelationship::FFI_NONE;
+
 			$preview = '';
-			if (!empty($contact['fetch_further_information']) && ($contact['fetch_further_information'] < 3)) {
+			if (in_array($fetch_further_information, [LocalRelationship::FFI_INFORMATION, LocalRelationship::FFI_BOTH])) {
 				// Handle enclosures and treat them as preview picture
 				foreach ($attachments as $attachment) {
 					if ($attachment['mimetype'] == 'image/jpeg') {
@@ -553,7 +614,12 @@ class Feed
 					}
 				}
 
-				$data = PageInfo::queryUrl($item['plink'], false, $preview, ($contact['fetch_further_information'] == 2), $contact['ffi_keyword_denylist'] ?? '');
+				$data = PageInfo::queryUrl(
+					$item['plink'],
+					false,
+					$fetch_further_information == LocalRelationship::FFI_BOTH,
+					$contact['ffi_keyword_denylist'] ?? ''
+				);
 
 				if (!empty($data)) {
 					// Take the data that was provided by the feed if the query is empty
@@ -572,7 +638,7 @@ class Feed
 					// We always strip the title since it will be added in the page information
 					$item['title'] = '';
 					$item['body'] = $item['body'] . "\n" . PageInfo::getFooterFromData($data, false);
-					$taglist = $contact['fetch_further_information'] == 2 ? PageInfo::getTagsFromUrl($item['plink'], $preview, $contact['ffi_keyword_denylist'] ?? '') : [];
+					$taglist = $fetch_further_information == LocalRelationship::FFI_BOTH ? PageInfo::getTagsFromUrl($item['plink'], $preview, $contact['ffi_keyword_denylist'] ?? '') : [];
 					$item['object-type'] = Activity\ObjectType::BOOKMARK;
 					$attachments = [];
 
@@ -604,7 +670,7 @@ class Feed
 					$item['body'] = '[abstract]' . HTML::toBBCode($summary, $basepath) . "[/abstract]\n" . $item['body'];
 				}
 
-				if (!empty($contact['fetch_further_information']) && ($contact['fetch_further_information'] == 3)) {
+				if ($fetch_further_information == LocalRelationship::FFI_KEYWORD) {
 					if (empty($taglist)) {
 						$taglist = PageInfo::getTagsFromUrl($item['plink'], $preview, $contact['ffi_keyword_denylist'] ?? '');
 					}

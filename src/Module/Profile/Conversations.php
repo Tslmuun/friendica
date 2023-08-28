@@ -103,10 +103,10 @@ class Conversations extends BaseProfile
 			$this->page['htmlhead'] .= '<meta content="noindex, noarchive" name="robots" />' . "\n";
 		}
 
-		$this->page['htmlhead'] .= '<link rel="alternate" type="application/atom+xml" href="' . $this->baseUrl . '/dfrn_poll/' . $this->parameters['nickname'] . '" title="DFRN: ' . $this->t('%s\'s timeline', $profile['name']) . '"/>' . "\n";
-		$this->page['htmlhead'] .= '<link rel="alternate" type="application/atom+xml" href="' . $this->baseUrl . '/feed/' . $this->parameters['nickname'] . '/" title="' . $this->t('%s\'s posts', $profile['name']) . '"/>' . "\n";
-		$this->page['htmlhead'] .= '<link rel="alternate" type="application/atom+xml" href="' . $this->baseUrl . '/feed/' . $this->parameters['nickname'] . '/comments" title="' . $this->t('%s\'s comments', $profile['name']) . '"/>' . "\n";
-		$this->page['htmlhead'] .= '<link rel="alternate" type="application/atom+xml" href="' . $this->baseUrl . '/feed/' . $this->parameters['nickname'] . '/activity" title="' . $this->t('%s\'s timeline', $profile['name']) . '"/>' . "\n";
+		$this->page['htmlhead'] .= '<link rel="alternate" type="application/atom+xml" href="' . $this->baseUrl . '/dfrn_poll/' . $this->parameters['nickname'] . '" title="DFRN: ' . $this->t('%s\'s timeline', Strings::escapeHtml($profile['name'])) . '"/>' . "\n";
+		$this->page['htmlhead'] .= '<link rel="alternate" type="application/atom+xml" href="' . $this->baseUrl . '/feed/' . $this->parameters['nickname'] . '/" title="' . $this->t('%s\'s posts', Strings::escapeHtml($profile['name'])) . '"/>' . "\n";
+		$this->page['htmlhead'] .= '<link rel="alternate" type="application/atom+xml" href="' . $this->baseUrl . '/feed/' . $this->parameters['nickname'] . '/comments" title="' . $this->t('%s\'s comments', Strings::escapeHtml($profile['name'])) . '"/>' . "\n";
+		$this->page['htmlhead'] .= '<link rel="alternate" type="application/atom+xml" href="' . $this->baseUrl . '/feed/' . $this->parameters['nickname'] . '/activity" title="' . $this->t('%s\'s timeline', Strings::escapeHtml($profile['name'])) . '"/>' . "\n";
 
 		$category = $datequery = $datequery2 = '';
 
@@ -165,7 +165,7 @@ class Conversations extends BaseProfile
 			$o .= $this->conversation->statusEditor($x);
 		}
 
-		// Get permissions SQL - if $remote_contact is true, our remote user has been pre-verified and we already have fetched his/her groups
+		// Get permissions SQL - if $remote_contact is true, our remote user has been pre-verified and we already have fetched their circles
 		$condition = Item::getPermissionsConditionArrayByUserId($profile['uid']);
 
 		$last_updated_array = $this->session->get('last_updated', []);
@@ -188,7 +188,7 @@ class Conversations extends BaseProfile
 			$condition = DBA::mergeConditions($condition, ["`received` >= ?", DateTimeFormat::convert($datequery2, 'UTC', $this->app->getTimeZone())]);
 		}
 
-		// Does the profile page belong to a forum?
+		// Does the profile page belong to a group?
 		// If not then we can improve the performance with an additional condition
 		if ($profile['account-type'] != User::ACCOUNT_TYPE_COMMUNITY) {
 			$condition = DBA::mergeConditions($condition, ['contact-id' => $profile['id']]);
@@ -240,7 +240,7 @@ class Conversations extends BaseProfile
 			$items  = array_merge($items, $pinned);
 		}
 
-		$o .= $this->conversation->create($items, Conversation::MODE_PROFILE, false, false, 'pinned_received', $profile['uid']);
+		$o .= $this->conversation->render($items, Conversation::MODE_PROFILE, false, false, 'pinned_received', $profile['uid']);
 
 		$o .= $pager->renderMinimal(count($items));
 

@@ -64,7 +64,7 @@ class App
 {
 	const PLATFORM = 'Friendica';
 	const CODENAME = 'Giant Rhubarb';
-	const VERSION  = '2023.06-dev';
+	const VERSION  = '2023.09-dev';
 
 	// Allow themes to control internal parameters
 	// by changing App values in theme.php
@@ -335,7 +335,13 @@ class App
 	 */
 	protected function load(DbaDefinition $dbaDefinition, ViewDefinition $viewDefinition)
 	{
-		set_time_limit(0);
+		if ($this->config->get('system', 'ini_max_execution_time') !== false) {
+			set_time_limit((int)$this->config->get('system', 'ini_max_execution_time'));
+		}
+
+		if ($this->config->get('system', 'ini_pcre_backtrack_limit') !== false) {
+			ini_set('pcre.backtrack_limit', (int)$this->config->get('system', 'ini_pcre_backtrack_limit'));
+		}
 
 		// Normally this constant is defined - but not if "pcntl" isn't installed
 		if (!defined('SIGTERM')) {
@@ -344,9 +350,6 @@ class App
 
 		// Ensure that all "strtotime" operations do run timezone independent
 		date_default_timezone_set('UTC');
-
-		// This has to be quite large to deal with embedded private photos
-		ini_set('pcre.backtrack_limit', 500000);
 
 		set_include_path(
 			get_include_path() . PATH_SEPARATOR
@@ -578,6 +581,7 @@ class App
 				// Force SSL redirection
 				if ($this->config->get('system', 'force_ssl') &&
 					(empty($server['HTTPS']) || $server['HTTPS'] === 'off') &&
+					(empty($server['HTTP_X_FORWARDED_PROTO']) || $server['HTTP_X_FORWARDED_PROTO'] === 'http') &&
 					!empty($server['REQUEST_METHOD']) &&
 					$server['REQUEST_METHOD'] === 'GET') {
 					System::externalRedirect($this->baseURL . '/' . $this->args->getQueryString());
@@ -691,6 +695,9 @@ class App
 				$module = $router->getModule();
 			}
 
+			// Display can change depending on the requested language, so it shouldn't be cached whole
+			header('Vary: Accept-Language', false);
+
 			// Processes data from GET requests
 			$httpinput = $httpInput->process();
 			$input     = array_merge($httpinput['variables'], $httpinput['files'], $request ?? $_REQUEST);
@@ -699,11 +706,13 @@ class App
 			$timestamp = microtime(true);
 			$response = $module->run($httpException, $input);
 			$this->profiler->set(microtime(true) - $timestamp, 'content');
+
+			// Wrapping HTML responses in the theme template
 			if ($response->getHeaderLine(ICanCreateResponses::X_HEADER) === ICanCreateResponses::TYPE_HTML) {
-				$page->run($this, $this->baseURL, $this->args, $this->mode, $response, $this->l10n, $this->profiler, $this->config, $pconfig, $nav, $this->session->getLocalUserId());
-			} else {
-				$page->exit($response);
+				$response = $page->run($this, $this->baseURL, $this->args, $this->mode, $response, $this->l10n, $this->profiler, $this->config, $pconfig, $nav, $this->session->getLocalUserId());
 			}
+
+			$page->exit($response);
 		} catch (HTTPException $e) {
 			$httpException->rawContent($e);
 		}

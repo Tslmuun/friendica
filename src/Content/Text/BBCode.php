@@ -62,8 +62,10 @@ class BBCode
 	const TWITTER      = 8;
 	const BACKLINK     = 8;
 	const ACTIVITYPUB  = 9;
+	const BLUESKY      = 10;
 
-	const TOP_ANCHOR = '<br class="top-anchor">';
+	const SHARED_ANCHOR = '<hr class="shared-anchor">';
+	const TOP_ANCHOR    = '<br class="top-anchor">';
 	const BOTTOM_ANCHOR = '<br class="button-anchor">';
 
 	const PREVIEW_NONE     = 0;
@@ -140,7 +142,7 @@ class BBCode
 						break;
 
 					case 'title':
-						$value = self::convert(html_entity_decode($value, ENT_QUOTES, 'UTF-8'), false, true);
+						$value = self::toPlaintext(html_entity_decode($value, ENT_QUOTES, 'UTF-8'));
 						$value = html_entity_decode($value, ENT_QUOTES, 'UTF-8');
 						$value = str_replace(['[', ']'], ['&#91;', '&#93;'], $value);
 						$data['title'] = $value;
@@ -234,7 +236,7 @@ class BBCode
 		// Remove attachment
 		$text = self::replaceAttachment($text);
 
-		$naked_text = HTML::toPlaintext(self::convert($text, false, 0, true), 0, !$keep_urls);
+		$naked_text = HTML::toPlaintext(self::convert($text, false, BBCode::EXTERNAL, true), 0, !$keep_urls);
 
 		DI::profiler()->stopRecording();
 		return $naked_text;
@@ -508,26 +510,7 @@ class BBCode
 	 */
 	private static function convertUrlForActivityPub(string $url): string
 	{
-		return sprintf('<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>', $url, self::getStyledURL($url));
-	}
-
-	/**
-	 * Converts an URL in a nicer format (without the scheme and possibly shortened)
-	 *
-	 * @param string $url URL that is about to be reformatted
-	 * @return string reformatted link
-	 */
-	private static function getStyledURL(string $url): string
-	{
-		$parts = parse_url($url);
-		$scheme = $parts['scheme'] . '://';
-		$styled_url = str_replace($scheme, '', $url);
-
-		if (strlen($styled_url) > 30) {
-			$styled_url = substr($styled_url, 0, 30) . "…";
-		}
-
-		return $styled_url;
+		return sprintf('<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>', $url, Strings::getStyledURL($url));
 	}
 
 	/*
@@ -948,7 +931,7 @@ class BBCode
 				$network = $contact['network'] ?? Protocol::PHANTOM;
 
 				$tpl = Renderer::getMarkupTemplate('shared_content.tpl');
-				$text .= Renderer::replaceMacros($tpl, [
+				$text .= BBCode::SHARED_ANCHOR . Renderer::replaceMacros($tpl, [
 					'$profile'      => $attributes['profile'],
 					'$avatar'       => $attributes['avatar'],
 					'$author'       => $attributes['author'],
@@ -1173,6 +1156,40 @@ class BBCode
 		}
 
 		return $match[1] . '[url=' . $data['url'] . ']' . $data['nick'] . '[/url]';
+	}
+
+	/**
+	 * Normalize links to Youtube and Vimeo to a unified format.
+	 *
+	 * @param string $text
+	 * @return string
+	 */
+	private static function normalizeVideoLinks(string $text): string
+	{
+		$text = preg_replace("/\[youtube\]https?:\/\/www.youtube.com\/watch\?v\=(.*?)\[\/youtube\]/ism", '[youtube]$1[/youtube]', $text);
+		$text = preg_replace("/\[youtube\]https?:\/\/www.youtube.com\/embed\/(.*?)\[\/youtube\]/ism", '[youtube]$1[/youtube]', $text);
+		$text = preg_replace("/\[youtube\]https?:\/\/www.youtube.com\/shorts\/(.*?)\[\/youtube\]/ism", '[youtube]$1[/youtube]', $text);
+		$text = preg_replace("/\[youtube\]https?:\/\/youtu.be\/(.*?)\[\/youtube\]/ism", '[youtube]$1[/youtube]', $text);
+
+		$text = preg_replace("/\[vimeo\]https?:\/\/player.vimeo.com\/video\/([0-9]+)(.*?)\[\/vimeo\]/ism", '[vimeo]$1[/vimeo]', $text);
+		$text = preg_replace("/\[vimeo\]https?:\/\/vimeo.com\/([0-9]+)(.*?)\[\/vimeo\]/ism", '[vimeo]$1[/vimeo]', $text);
+
+		return $text;
+	}
+
+	/**
+	 * Expand Youtube and Vimeo links to 
+	 *
+	 * @param string $text
+	 * @return string
+	 */
+	public static function expandVideoLinks(string $text): string
+	{
+		$text = self::normalizeVideoLinks($text);
+		$text = preg_replace("/\[youtube\]([A-Za-z0-9\-_=]+)(.*?)\[\/youtube\]/ism", '[url=https://www.youtube.com/watch?v=$1]https://www.youtube.com/watch?v=$1[/url]', $text);
+		$text = preg_replace("/\[vimeo\]([0-9]+)(.*?)\[\/vimeo\]/ism", '[url=https://vimeo.com/$1]https://vimeo.com/$1[/url]', $text);
+
+		return $text;
 	}
 
 	/**
@@ -1403,12 +1420,32 @@ class BBCode
 				}
 
 				// Check for headers
-				$text = preg_replace("(\[h1\](.*?)\[\/h1\])ism", '</p><h1>$1</h1><p>', $text);
-				$text = preg_replace("(\[h2\](.*?)\[\/h2\])ism", '</p><h2>$1</h2><p>', $text);
-				$text = preg_replace("(\[h3\](.*?)\[\/h3\])ism", '</p><h3>$1</h3><p>', $text);
-				$text = preg_replace("(\[h4\](.*?)\[\/h4\])ism", '</p><h4>$1</h4><p>', $text);
-				$text = preg_replace("(\[h5\](.*?)\[\/h5\])ism", '</p><h5>$1</h5><p>', $text);
-				$text = preg_replace("(\[h6\](.*?)\[\/h6\])ism", '</p><h6>$1</h6><p>', $text);
+
+				if ($simple_html == self::INTERNAL) {
+					//Ensure to always start with <h4> if possible
+					$heading_count = 0;
+					for ($level = 6; $level > 0; $level--) { 
+						if (preg_match("(\[h$level\].*?\[\/h$level\])ism", $text)) {
+							$heading_count++;
+						}
+					}
+					if ($heading_count > 0) {
+						$heading = min($heading_count + 3, 6);
+						for ($level = 6; $level > 0; $level--) { 
+							if (preg_match("(\[h$level\].*?\[\/h$level\])ism", $text)) {
+								$text = preg_replace("(\[h$level\](.*?)\[\/h$level\])ism", "</p><h$heading>$1</h$heading><p>", $text);
+								$heading--;
+							}
+						}
+					}
+				} else {
+					$text = preg_replace("(\[h1\](.*?)\[\/h1\])ism", '</p><h1>$1</h1><p>', $text);
+					$text = preg_replace("(\[h2\](.*?)\[\/h2\])ism", '</p><h2>$1</h2><p>', $text);
+					$text = preg_replace("(\[h3\](.*?)\[\/h3\])ism", '</p><h3>$1</h3><p>', $text);
+					$text = preg_replace("(\[h4\](.*?)\[\/h4\])ism", '</p><h4>$1</h4><p>', $text);
+					$text = preg_replace("(\[h5\](.*?)\[\/h5\])ism", '</p><h5>$1</h5><p>', $text);
+					$text = preg_replace("(\[h6\](.*?)\[\/h6\])ism", '</p><h6>$1</h6><p>', $text);
+				}
 
 				// Check for paragraph
 				$text = preg_replace("(\[p\](.*?)\[\/p\])ism", '<p>$1</p>', $text);
@@ -1652,12 +1689,9 @@ class BBCode
 				// Backward compatibility, [iframe] support has been removed in version 2020.12
 				$text = preg_replace("/\[iframe\](.*?)\[\/iframe\]/ism", '<a href="$1">$1</a>', $text);
 
-				// Youtube extensions
-				$text = preg_replace("/\[youtube\]https?:\/\/www.youtube.com\/watch\?v\=(.*?)\[\/youtube\]/ism", '[youtube]$1[/youtube]', $text);
-				$text = preg_replace("/\[youtube\]https?:\/\/www.youtube.com\/embed\/(.*?)\[\/youtube\]/ism", '[youtube]$1[/youtube]', $text);
-				$text = preg_replace("/\[youtube\]https?:\/\/www.youtube.com\/shorts\/(.*?)\[\/youtube\]/ism", '[youtube]$1[/youtube]', $text);
-				$text = preg_replace("/\[youtube\]https?:\/\/youtu.be\/(.*?)\[\/youtube\]/ism", '[youtube]$1[/youtube]', $text);
+				$text = self::normalizeVideoLinks($text);
 
+				// Youtube extensions
 				if ($try_oembed) {
 					$text = preg_replace("/\[youtube\]([A-Za-z0-9\-_=]+)(.*?)\[\/youtube\]/ism", '<iframe width="' . $a->getThemeInfoValue('videowidth') . '" height="' . $a->getThemeInfoValue('videoheight') . '" src="https://www.youtube.com/embed/$1" frameborder="0" ></iframe>', $text);
 				} else {
@@ -1668,9 +1702,7 @@ class BBCode
 					);
 				}
 
-				$text = preg_replace("/\[vimeo\]https?:\/\/player.vimeo.com\/video\/([0-9]+)(.*?)\[\/vimeo\]/ism", '[vimeo]$1[/vimeo]', $text);
-				$text = preg_replace("/\[vimeo\]https?:\/\/vimeo.com\/([0-9]+)(.*?)\[\/vimeo\]/ism", '[vimeo]$1[/vimeo]', $text);
-
+				// Vimeo extensions
 				if ($try_oembed) {
 					$text = preg_replace("/\[vimeo\]([0-9]+)(.*?)\[\/vimeo\]/ism", '<iframe width="' . $a->getThemeInfoValue('videowidth') . '" height="' . $a->getThemeInfoValue('videoheight') . '" src="https://player.vimeo.com/video/$1" frameborder="0" ></iframe>', $text);
 				} else {
@@ -1770,7 +1802,7 @@ class BBCode
 					$text
 				);
 
-				if (in_array($simple_html, [self::OSTATUS, self::TWITTER])) {
+				if (in_array($simple_html, [self::OSTATUS, self::TWITTER, self::BLUESKY])) {
 					$text = preg_replace_callback("/([^#@!])\[url\=([^\]]*)\](.*?)\[\/url\]/ism", [self::class, 'expandLinksCallback'], $text);
 					//$text = preg_replace("/[^#@!]\[url\=([^\]]*)\](.*?)\[\/url\]/ism", ' $2 [url]$1[/url]', $text);
 					$text = preg_replace("/\[bookmark\=([^\]]*)\](.*?)\[\/bookmark\]/ism", ' $2 [url]$1[/url]', $text);
@@ -2062,7 +2094,7 @@ class BBCode
 
 		// Convert it to HTML - don't try oembed
 		if ($for_diaspora) {
-			$text = self::convert($text, false, self::DIASPORA);
+			$text = self::convertForUriId(0, $text, self::DIASPORA);
 
 			// Add all tags that maybe were removed
 			if (preg_match_all("/#\[url\=([$url_search_string]*)\](.*?)\[\/url\]/ism", $original_text, $tags)) {
@@ -2076,7 +2108,7 @@ class BBCode
 				$text = $text . ' ' . $tagline;
 			}
 		} else {
-			$text = self::convert($text, false, self::CONNECTORS);
+			$text = self::convertForUriId(0, $text, self::CONNECTORS);
 		}
 
 		// If a link is followed by a quote then there should be a newline before it

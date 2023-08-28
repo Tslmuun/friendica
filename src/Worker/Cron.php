@@ -21,6 +21,7 @@
 
 namespace Friendica\Worker;
 
+use Friendica\Core\Addon;
 use Friendica\Core\Hook;
 use Friendica\Core\Logger;
 use Friendica\Core\Worker;
@@ -146,6 +147,8 @@ class Cron
 			// Update "blocked" status of servers
 			Worker::add(Worker::PRIORITY_LOW, 'UpdateBlockedServers');
 
+			Addon::reload();
+
 			DI::keyValue()->set('last_cron_daily', time());
 		}
 
@@ -163,15 +166,6 @@ class Cron
 	{
 		Logger::info('Looking for sleeping processes');
 
-		$processes = DBA::p("SHOW FULL PROCESSLIST");
-		while ($process = DBA::fetch($processes)) {
-			if (($process['Command'] != 'Sleep') || ($process['Time'] < 300) || ($process['db'] != DBA::databaseName())) {
-				continue;
-			}
-
-			DBA::e("KILL ?", $process['Id']);
-			Logger::notice('Killed sleeping process', ['id' => $process['Id']]);
-		}
-		DBA::close($processes);
+		DBA::deleteSleepingProcesses();
 	}
 }

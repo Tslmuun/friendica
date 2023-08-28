@@ -310,10 +310,10 @@ return [
 		// Number of "free" searches when system => permit_crawling is enabled.
 		'free_crawls' => 10,
 
-		// groupedit_image_limit (Integer)
-		// Number of contacts at which the group editor should switch from display the profile pictures of the contacts to only display the names.
+		// circle_edit_image_limit (Integer)
+		// Number of contacts at which the circle editor should switch from display the profile pictures of the contacts to only display the names.
 		// This can alternatively be set on a per-account basis in the pconfig table.
-		'groupedit_image_limit' => 400,
+		'circle_edit_image_limit' => 400,
 
 		// gserver_update_limit (Integer)
 		// How many servers should be checked at a time?
@@ -340,6 +340,14 @@ return [
 		// ipv4_resolve (Boolean)
 		// Resolve IPV4 addresses only. Don't resolve to IPV6.
 		'ipv4_resolve' => false,
+
+		// ini_max_execution_time (False|Integer)
+		// Set the number of seconds a script is allowed to run. Default unlimited for Friendica, false to use the system value.
+		'ini_max_execution_time' => 0,
+
+		// ini_pcre_backtrack_limit (False|Integer)
+		// This has to be quite large to deal with embedded private photos. False to use the system value.
+		'ini_pcre_backtrack_limit' => 500000,
 
 		// invitation_only (Boolean)
 		// If set true registration is only possible after a current member of the node has sent an invitation.
@@ -535,11 +543,11 @@ return [
 		'pushpoll_frequency' => 3,
 
 		// redis_host (String)
-		// Host name of the redis daemon.
+		// Host name or the path to the Unix domain socket of the Redis daemon.
 		'redis_host' => '127.0.0.1',
 
-		// redis_port (String)
-		// Port number of the redis daemon.
+		// redis_port (Integer)
+		// Port number of the Redis daemon, should be -1 for unix domain socket
 		'redis_port' => 6379,
 
 		// redis_db (Integer)
@@ -625,7 +633,7 @@ return [
 		'throttle_limit_month' => 0,
 
 		// transmit_pending_events (Boolean)
-		// Transmit pending events upon accepted contact request for forums
+		// Transmit pending events upon accepted contact request for groups
 		'transmit_pending_events' => false,
 
 		// update_active_contacts (Boolean)
@@ -772,5 +780,20 @@ return [
 		// use_sub_dirs (Boolean)
 		// By default the template cache is stored in several subdirectories.
 		'use_sub_dirs' => true,
+	],
+	'api' => [
+		// mastodon_banner (String)
+		// Default banner image for Mastodon API, must be a relative path from the base Friendica folder
+		//
+		// Default picture credits:
+		// Author: Lostinlight <https://mastodon.xyz/@lightone>
+		// License: CC0 https://creativecommons.org/share-your-work/public-domain/cc0/
+		// Link to original work: https://gitlab.com/lostinlight/per_aspera_ad_astra/-/blob/master/friendica-404/friendica-promo-bubbles.jpg
+		'mastodon_banner' => '/images/friendica-banner.jpg',
+	],
+	'blocklist' => [
+		// public (Boolean)
+		// Wether the blocklist is publicly listed under /about (or in any later API)
+		'public' => true,
 	],
 ];

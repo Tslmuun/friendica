@@ -54,8 +54,9 @@
 
 use Friendica\Database\DBA;
 
+// This file is required several times during the test in DbaDefinition which justifies this condition
 if (!defined('DB_UPDATE_VERSION')) {
-	define('DB_UPDATE_VERSION', 1518);
+	define('DB_UPDATE_VERSION', 1529);
 }
 
 return [
@@ -158,6 +159,18 @@ return [
 			"email" => ["email(64)"],
 		]
 	],
+	"user-gserver" => [
+		"comment" => "User settings about remote servers",
+		"fields" => [
+			"uid" => ["type" => "mediumint unsigned", "not null" => "1", "default" => "0", "foreign" => ["user" => "uid"], "comment" => "Owner User id"],
+			"gsid" => ["type" => "int unsigned", "not null" => "1", "default" => "0", "foreign" => ["gserver" => "id"], "comment" => "Gserver id"],
+			"ignored" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "server accounts are ignored for the user"],
+		],
+		"indexes" => [
+			"PRIMARY" => ["uid", "gsid"],
+			"gsid" => ["gsid"]
+		],
+	],
 	"item-uri" => [
 		"comment" => "URI and GUID for items",
 		"fields" => [
@@ -217,8 +230,8 @@ return [
 			"archive" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => ""],
 			"unsearchable" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "Contact prefers to not be searchable"],
 			"sensitive" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "Contact posts sensitive content"],
-			"baseurl" => ["type" => "varbinary(383)", "default" => "", "comment" => "baseurl of the contact"],
-			"gsid" => ["type" => "int unsigned", "foreign" => ["gserver" => "id", "on delete" => "restrict"], "comment" => "Global Server ID"],
+			"baseurl" => ["type" => "varbinary(383)", "default" => "", "comment" => "baseurl of the contact from the gserver record, can be missing"],
+			"gsid" => ["type" => "int unsigned", "foreign" => ["gserver" => "id", "on delete" => "restrict"], "comment" => "Global Server ID, can be missing"],
 			"bd" => ["type" => "date", "not null" => "1", "default" => DBA::NULL_DATE, "comment" => ""],
 			// User depending fields
 			"reason" => ["type" => "text", "comment" => ""],
@@ -249,7 +262,7 @@ return [
 			"confirm" => ["type" => "varbinary(383)", "comment" => ""],
 			"poco" => ["type" => "varbinary(383)", "comment" => ""],
 			"writable" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => ""],
-			"forum" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "contact is a forum. Deprecated, use 'contact-type' = 'community' and 'manually-approve' = false instead"],
+			"forum" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "contact is a group. Deprecated, use 'contact-type' = 'community' and 'manually-approve' = false instead"],
 			"prv" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "contact is a private group. Deprecated, use 'contact-type' = 'community' and 'manually-approve' = true instead"],
 			"bdyear" => ["type" => "varchar(4)", "not null" => "1", "default" => "", "comment" => ""],
 			// Deprecated fields that aren't in use anymore
@@ -311,9 +324,9 @@ return [
 			"id" => ["type" => "int unsigned", "not null" => "1", "extra" => "auto_increment", "primary" => "1", "comment" => "sequential ID"],
 			"uid" => ["type" => "mediumint unsigned", "not null" => "1", "default" => "0", "foreign" => ["user" => "uid"], "comment" => "Owner id of this permission set"],
 			"allow_cid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed contact.id '<19><78>'"],
-			"allow_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed groups"],
+			"allow_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed circles"],
 			"deny_cid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied contact.id"],
-			"deny_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied groups"],
+			"deny_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied circles"],
 		],
 		"indexes" => [
 			"PRIMARY" => ["id"],
@@ -513,9 +526,9 @@ return [
 			"created" => ["type" => "datetime", "not null" => "1", "default" => DBA::NULL_DATETIME, "comment" => "creation time"],
 			"edited" => ["type" => "datetime", "not null" => "1", "default" => DBA::NULL_DATETIME, "comment" => "last edit time"],
 			"allow_cid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed contact.id '<19><78>"],
-			"allow_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed groups"],
+			"allow_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed circles"],
 			"deny_cid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied contact.id"],
-			"deny_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied groups"],
+			"deny_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied circles"],
 			"backend-class" => ["type" => "tinytext", "comment" => "Storage backend class"],
 			"backend-ref" => ["type" => "text", "comment" => "Storage backend data reference"],
 		],
@@ -715,9 +728,9 @@ return [
 			"nofinish" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "if event does have no end this is 1"],
 			"ignore" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "0 or 1"],
 			"allow_cid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed contact.id '<19><78>'"],
-			"allow_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed groups"],
+			"allow_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed circles"],
 			"deny_cid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied contact.id"],
-			"deny_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied groups"],
+			"deny_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied circles"],
 		],
 		"indexes" => [
 			"PRIMARY" => ["id"],
@@ -760,14 +773,14 @@ return [
 		]
 	],
 	"group" => [
-		"comment" => "privacy groups, group info",
+		"comment" => "privacy circles, circle info",
 		"fields" => [
 			"id" => ["type" => "int unsigned", "not null" => "1", "extra" => "auto_increment", "primary" => "1", "comment" => "sequential ID"],
 			"uid" => ["type" => "mediumint unsigned", "not null" => "1", "default" => "0", "foreign" => ["user" => "uid"], "comment" => "Owner User id"],
 			"visible" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "1 indicates the member list is not private"],
-			"deleted" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "1 indicates the group has been deleted"],
-			"cid" => ["type" => "int unsigned", "foreign" => ["contact" => "id"], "comment" => "Contact id of forum. When this field is filled then the members are synced automatically."],
-			"name" => ["type" => "varchar(255)", "not null" => "1", "default" => "", "comment" => "human readable name of group"],
+			"deleted" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "1 indicates the circle has been deleted"],
+			"cid" => ["type" => "int unsigned", "foreign" => ["contact" => "id"], "comment" => "Contact id of group. When this field is filled then the members are synced automatically."],
+			"name" => ["type" => "varchar(255)", "not null" => "1", "default" => "", "comment" => "human readable name of circle"],
 		],
 		"indexes" => [
 			"PRIMARY" => ["id"],
@@ -776,11 +789,11 @@ return [
 		]
 	],
 	"group_member" => [
-		"comment" => "privacy groups, member info",
+		"comment" => "privacy circles, member info",
 		"fields" => [
 			"id" => ["type" => "int unsigned", "not null" => "1", "extra" => "auto_increment", "primary" => "1", "comment" => "sequential ID"],
-			"gid" => ["type" => "int unsigned", "not null" => "1", "default" => "0", "foreign" => ["group" => "id"], "comment" => "groups.id of the associated group"],
-			"contact-id" => ["type" => "int unsigned", "not null" => "1", "default" => "0", "foreign" => ["contact" => "id"], "comment" => "contact.id of the member assigned to the associated group"],
+			"gid" => ["type" => "int unsigned", "not null" => "1", "default" => "0", "foreign" => ["group" => "id"], "comment" => "group.id of the associated circle"],
+			"contact-id" => ["type" => "int unsigned", "not null" => "1", "default" => "0", "foreign" => ["contact" => "id"], "comment" => "contact.id of the member assigned to the associated circle"],
 		],
 		"indexes" => [
 			"PRIMARY" => ["id"],
@@ -1150,9 +1163,9 @@ return [
 			"scale" => ["type" => "tinyint unsigned", "not null" => "1", "default" => "0", "comment" => ""],
 			"profile" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => ""],
 			"allow_cid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed contact.id '<19><78>'"],
-			"allow_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed groups"],
+			"allow_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of allowed circles"],
 			"deny_cid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied contact.id"],
-			"deny_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied groups"],
+			"deny_gid" => ["type" => "mediumtext", "comment" => "Access Control - list of denied circles"],
 			"accessible" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "Make photo publicly accessible, ignoring permissions"],
 			"backend-class" => ["type" => "tinytext", "comment" => "Storage backend class"],
 			"backend-ref" => ["type" => "text", "comment" => "Storage backend data reference"],
@@ -1582,7 +1595,7 @@ return [
 			"profile-name" => ["type" => "varchar(255)", "comment" => "Deprecated"],
 			"is-default" => ["type" => "boolean", "comment" => "Deprecated"],
 			"hide-friends" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "Hide friend list from viewers of this profile"],
-			"name" => ["type" => "varchar(255)", "not null" => "1", "default" => "", "comment" => ""],
+			"name" => ["type" => "varchar(255)", "not null" => "1", "default" => "", "comment" => "Unused in favor of user.username"],
 			"pdesc" => ["type" => "varchar(255)", "comment" => "Deprecated"],
 			"dob" => ["type" => "varchar(32)", "not null" => "1", "default" => "0000-00-00", "comment" => "Day of birth"],
 			"address" => ["type" => "varchar(255)", "not null" => "1", "default" => "", "comment" => ""],
@@ -1690,22 +1703,34 @@ return [
 			"uid" => ["type" => "mediumint unsigned", "foreign" => ["user" => "uid"], "comment" => "Reporting user"],
 			"reporter-id" => ["type" => "int unsigned", "foreign" => ["contact" => "id"], "comment" => "Reporting contact"],
 			"cid" => ["type" => "int unsigned", "not null" => "1", "foreign" => ["contact" => "id"], "comment" => "Reported contact"],
+			"gsid" => ["type" => "int unsigned", "foreign" => ["gserver" => "id"], "comment" => "Reported contact server"],
 			"comment" => ["type" => "text", "comment" => "Report"],
-			"category" => ["type" => "varchar(20)", "comment" => "Category of the report (spam, violation, other)"],
-			"rules" => ["type" => "text", "comment" => "Violated rules"],
+			"category-id" => ["type" => "int unsigned", "not null" => 1, "default" => \Friendica\Moderation\Entity\Report::CATEGORY_OTHER, "comment" => "Report category, one of Entity\Report::CATEGORY_*"],
 			"forward" => ["type" => "boolean", "comment" => "Forward the report to the remote server"],
-			"created" => ["type" => "datetime", "not null" => "1", "default" => DBA::NULL_DATETIME, "comment" => ""],
-			"status" => ["type" => "tinyint unsigned", "comment" => "Status of the report"],
+			"public-remarks" => ["type" => "text", "comment" => "Remarks shared with the reporter"],
+			"private-remarks" => ["type" => "text", "comment" => "Remarks shared with the moderation team"],
+			"last-editor-uid" => ["type" => "mediumint unsigned", "foreign" => ["user" => "uid"], "comment" => "Last editor user"],
+			"assigned-uid" => ["type" => "mediumint unsigned", "foreign" => ["user" => "uid"], "comment" => "Assigned moderator user"],
+			"status" => ["type" => "tinyint unsigned", "not null" => "1", "comment" => "Status of the report, one of Entity\Report::STATUS_*"],
+			"resolution" => ["type" => "tinyint unsigned", "comment" => "Resolution of the report, one of Entity\Report::RESOLUTION_*"],
+			"created" => ["type" => "datetime(6)", "not null" => "1", "default" => DBA::NULL_DATETIME, "comment" => ""],
+			"edited" => ["type" => "datetime(6)", "comment" => "Last time the report has been edited"],
 		],
 		"indexes" => [
 			"PRIMARY" => ["id"],
 			"uid" => ["uid"],
 			"cid" => ["cid"],
 			"reporter-id" => ["reporter-id"],
+			"gsid" => ["gsid"],
+			"last-editor-uid" => ["last-editor-uid"],
+			"assigned-uid" => ["assigned-uid"],
+			"status-resolution" => ["status", "resolution"],
+			"created" => ["created"],
+			"edited" => ["edited"],
 		]
 	],
 	"report-post" => [
-		"comment" => "",
+		"comment" => "Individual posts attached to a moderation report",
 		"fields" => [
 			"rid" => ["type" => "int unsigned", "not null" => "1", "primary" => "1", "foreign" => ["report" => "id"], "comment" => "Report id"],
 			"uri-id" => ["type" => "int unsigned", "not null" => "1", "primary" => "1", "foreign" => ["item-uri" => "id"], "comment" => "Uri-id of the reported post"],
@@ -1714,6 +1739,17 @@ return [
 		"indexes" => [
 			"PRIMARY" => ["rid", "uri-id"],
 			"uri-id" => ["uri-id"],
+		]
+	],
+	"report-rule" => [
+		"comment" => "Terms of service rule lines relevant to a moderation report",
+		"fields" => [
+			"rid" => ["type" => "int unsigned", "not null" => "1", "primary" => "1", "foreign" => ["report" => "id"], "comment" => "Report id"],
+			"line-id" => ["type" => "int unsigned", "not null" => "1", "primary" => "1", "comment" => "Terms of service rule line number, may become invalid after a TOS change."],
+			"text" => ["type" => "text", "not null" => "1", "comment" => "Terms of service rule text recorded at the time of the report"],
+		],
+		"indexes" => [
+			"PRIMARY" => ["rid", "line-id"],
 		]
 	],
 	"search" => [
@@ -1802,8 +1838,8 @@ return [
 			"rel" => ["type" => "tinyint unsigned", "comment" => "The kind of the relation between the user and the contact"],
 			"info" => ["type" => "mediumtext", "comment" => ""],
 			"notify_new_posts" => ["type" => "boolean", "comment" => ""],
-			"remote_self" => ["type" => "boolean", "comment" => ""],
-			"fetch_further_information" => ["type" => "tinyint unsigned", "comment" => ""],
+			"remote_self" => ["type" => "tinyint unsigned", "comment" => "0 => No mirroring, 1-2 => Mirror as own post, 3 => Mirror as reshare"],
+			"fetch_further_information" => ["type" => "tinyint unsigned", "comment" => "0 => None, 1 => Fetch information, 3 => Fetch keywords, 2 => Fetch both"],
 			"ffi_keyword_denylist" => ["type" => "text", "comment" => ""],
 			"subhub" => ["type" => "boolean", "comment" => ""],
 			"hub-verify" => ["type" => "varbinary(383)", "comment" => ""],

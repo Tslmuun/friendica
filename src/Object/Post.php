@@ -31,16 +31,15 @@ use Friendica\Core\Renderer;
 use Friendica\DI;
 use Friendica\Model\Contact;
 use Friendica\Model\Item;
-use Friendica\Model\Photo;
 use Friendica\Model\Post as PostModel;
 use Friendica\Model\Tag;
 use Friendica\Model\User;
 use Friendica\Protocol\Activity;
 use Friendica\Util\Crypto;
 use Friendica\Util\DateTimeFormat;
-use Friendica\Util\Proxy;
 use Friendica\Util\Strings;
 use Friendica\Util\Temporal;
+use GuzzleHttp\Psr7\Uri;
 use InvalidArgumentException;
 
 /**
@@ -91,9 +90,13 @@ class Post
 		}
 
 		$this->writable = $this->getDataValue('writable') || $this->getDataValue('self');
-		$author = ['uid' => 0, 'id' => $this->getDataValue('author-id'),
+		$author = [
+			'uid'     => 0,
+			'id'      => $this->getDataValue('author-id'),
 			'network' => $this->getDataValue('author-network'),
-			'url' => $this->getDataValue('author-link')];
+			'url'     => $this->getDataValue('author-link'),
+			'alias'   => $this->getDataValue('author-alias')
+		];
 		$this->redirect_url = Contact::magicLinkByContact($author);
 		if (!$this->isToplevel()) {
 			$this->threaded = true;
@@ -206,7 +209,7 @@ class Post
 		$connector = !in_array($item['network'], Protocol::NATIVE_SUPPORT) ? DI::l10n()->t('Connector Message') : false;
 
 		$shareable    = in_array($conv->getProfileOwner(), [0, DI::userSession()->getLocalUserId()]) && $item['private'] != Item::PRIVATE;
-		$announceable = $shareable && in_array($item['network'], [Protocol::ACTIVITYPUB, Protocol::DFRN, Protocol::DIASPORA, Protocol::TWITTER, Protocol::TUMBLR]);
+		$announceable = $shareable && in_array($item['network'], [Protocol::ACTIVITYPUB, Protocol::DFRN, Protocol::DIASPORA, Protocol::TWITTER, Protocol::TUMBLR, Protocol::BLUESKY]);
 		$commentable  = ($item['network'] != Protocol::TUMBLR);
 
 		// On Diaspora only toplevel posts can be reshared
@@ -244,32 +247,47 @@ class Post
 			$pinned = DI::l10n()->t('Pinned item');
 		}
 
-		// Showing the one or the other text, depending upon if we can only hide it or really delete it.
-		$delete = $origin ? DI::l10n()->t('Delete globally') : DI::l10n()->t('Remove locally');
-
-		$drop   = false;
-		$block  = false;
-		$ignore = false;
+		$drop         = false;
+		$block        = false;
+		$ignore       = false;
+		$collapse     = false;
+		$report       = false;
+		$ignoreServer = false;
 		if (DI::userSession()->getLocalUserId()) {
 			$drop = [
 				'dropping' => $dropping,
 				'pagedrop' => $item['pagedrop'],
 				'select' => DI::l10n()->t('Select'),
-				'delete' => $delete,
+				'label' => $origin ? DI::l10n()->t('Delete globally') : DI::l10n()->t('Remove locally'),
 			];
 		}
 
 		if (!$item['self'] && DI::userSession()->getLocalUserId()) {
 			$block = [
 				'blocking'  => true,
-				'block'     => DI::l10n()->t('Block %s', $item['author-name']),
+				'label'     => DI::l10n()->t('Block %s', $item['author-name']),
 				'author_id' => $item['author-id'],
 			];
 			$ignore = [
 				'ignoring'  => true,
-				'ignore'    => DI::l10n()->t('Ignore %s', $item['author-name']),
+				'label'     => DI::l10n()->t('Ignore %s', $item['author-name']),
 				'author_id' => $item['author-id'],
 			];
+			$collapse = [
+				'collapsing' => true,
+				'label'      => DI::l10n()->t('Collapse %s', $item['author-name']),
+				'author_id'  => $item['author-id'],
+			];
+			$report = [
+				'label' => DI::l10n()->t('Report post'),
+				'href'  => 'moderation/report/create?' . http_build_query(['cid' => $item['author-id'], 'uri-ids' => [$item['uri-id']]]),
+			];
+			$authorBaseUri = new Uri($item['author-baseurl'] ?? '');
+			if ($authorBaseUri->getHost() && !DI::baseUrl()->isLocalUrl($authorBaseUri)) {
+				$ignoreServer = [
+					'label' => DI::l10n()->t("Ignore %s server", $authorBaseUri->getHost()),
+				];
+			}
 		}
 
 		$filer = DI::userSession()->getLocalUserId() ? DI::l10n()->t('Save to folder') : false;
@@ -280,8 +298,13 @@ class Post
 		}
 
 		if (DI::userSession()->isAuthenticated()) {
-			$author = ['uid' => 0, 'id' => $item['author-id'],
-				'network' => $item['author-network'], 'url' => $item['author-link']];
+			$author = [
+				'uid'     => 0,
+				'id'      => $item['author-id'],
+				'network' => $item['author-network'],
+				'url'     => $item['author-link'],
+				'alias'   => $item['author-alias'],
+			];
 			$profile_link = Contact::magicLinkByContact($author);
 		} else {
 			$profile_link = $item['author-link'];
@@ -382,7 +405,7 @@ class Post
 		}
 
 		if ($conv->isWritable()) {
-			$buttons['like']    = [DI::l10n()->t("I like this \x28toggle\x29")      , DI::l10n()->t('Like')];
+			$buttons['like']    = [DI::l10n()->t("I like this \x28toggle\x29"), DI::l10n()->t('Like')];
 			$buttons['dislike'] = [DI::l10n()->t("I don't like this \x28toggle\x29"), DI::l10n()->t('Dislike')];
 			if ($shareable) {
 				$buttons['share'] = [DI::l10n()->t('Quote share this'), DI::l10n()->t('Quote Share')];
@@ -445,8 +468,10 @@ class Post
 
 		// Fetching of Diaspora posts doesn't always work. There are issues with reshares and possibly comments
 		if (!DI::userSession()->getLocalUserId() && ($item['network'] != Protocol::DIASPORA) && !empty(DI::session()->get('remote_comment'))) {
-			$remote_comment = [DI::l10n()->t('Comment this item on your system'), DI::l10n()->t('Remote comment'),
-				str_replace('{uri}', urlencode($item['uri']), DI::session()->get('remote_comment'))];
+			$remote_comment = [
+				DI::l10n()->t('Comment this item on your system'), DI::l10n()->t('Remote comment'),
+				str_replace('{uri}', urlencode($item['uri']), DI::session()->get('remote_comment'))
+			];
 
 			// Ensure to either display the remote comment or the local activities
 			$buttons = [];
@@ -536,6 +561,9 @@ class Post
 			'drop'            => $drop,
 			'block'           => $block,
 			'ignore_author'   => $ignore,
+			'collapse'        => $collapse,
+			'report'          => $report,
+			'ignore_server'     => $ignoreServer,
 			'vote'            => $buttons,
 			'like_html'       => $responses['like']['output'],
 			'dislike_html'    => $responses['dislike']['output'],
@@ -550,6 +578,7 @@ class Post
 			'wait'            => DI::l10n()->t('Please wait'),
 			'thread_level'    => $thread_level,
 			'edited'          => $edited,
+			'author_gsid'     => $item['author-gsid'],
 			'network'         => $item['network'],
 			'network_name'    => ContactSelector::networkToName($item['author-network'], $item['author-link'], $item['network'], $item['author-gsid']),
 			'network_icon'    => ContactSelector::networkToIcon($item['network'], $item['author-link'], $item['author-gsid']),
@@ -663,7 +692,6 @@ class Post
 					$title = DI::l10n()->t('Reacted with %s by: %s', $element['emoji'], $actors);
 					$icon  = [];
 					break;
-				break;
 			}
 			$emojis[$index] = ['emoji' => $element['emoji'], 'total' => $element['total'], 'title' => $title, 'icon' => $icon];
 		}
@@ -712,8 +740,10 @@ class Post
 		if ($item->getDataValue('network') === Protocol::MAIL && DI::userSession()->getLocalUserId() != $item->getDataValue('uid')) {
 			Logger::warning('Post object does not belong to local user', ['post' => $item, 'local_user' => DI::userSession()->getLocalUserId()]);
 			return false;
-		} elseif (DI::activity()->match($item->getDataValue('verb'), Activity::LIKE) ||
-		          DI::activity()->match($item->getDataValue('verb'), Activity::DISLIKE)) {
+		} elseif (
+			DI::activity()->match($item->getDataValue('verb'), Activity::LIKE) ||
+			DI::activity()->match($item->getDataValue('verb'), Activity::DISLIKE)
+		) {
 			Logger::warning('Post objects is a like/dislike', ['post' => $item]);
 			return false;
 		}
@@ -918,7 +948,7 @@ class Post
 
 		if ($conv) {
 			// This will allow us to comment on wall-to-wall items owned by our friends
-			// and community forums even if somebody else wrote the post.
+			// and community groups even if somebody else wrote the post.
 			// bug #517 - this fixes for conversation owner
 			if ($conv->getMode() == 'profile' && $conv->getProfileOwner() == DI::userSession()->getLocalUserId()) {
 				return true;
@@ -997,8 +1027,10 @@ class Post
 			}
 
 			$profile = Contact::getByURL($term['url'], false, ['addr', 'contact-type']);
-			if (!empty($profile['addr']) && (($profile['contact-type'] ?? Contact::TYPE_UNKNOWN) != Contact::TYPE_COMMUNITY) &&
-				($profile['addr'] != $owner['addr']) && !strstr($text, $profile['addr'])) {
+			if (
+				!empty($profile['addr']) && (($profile['contact-type'] ?? Contact::TYPE_UNKNOWN) != Contact::TYPE_COMMUNITY) &&
+				($profile['addr'] != $owner['addr']) && !strstr($text, $profile['addr'])
+			) {
 				$text .= '@' . $profile['addr'] . ' ';
 			}
 		}
@@ -1065,7 +1097,9 @@ class Post
 				'$edbold'      => DI::l10n()->t('Bold'),
 				'$editalic'    => DI::l10n()->t('Italic'),
 				'$eduline'     => DI::l10n()->t('Underline'),
+				'$contentwarn' => DI::l10n()->t('Content Warning'),
 				'$edquote'     => DI::l10n()->t('Quote'),
+				'$edemojis'    => DI::l10n()->t('Add emojis'),
 				'$edcode'      => DI::l10n()->t('Code'),
 				'$edimg'       => DI::l10n()->t('Image'),
 				'$edurl'       => DI::l10n()->t('Link'),
@@ -1125,6 +1159,7 @@ class Post
 							'id'      => $this->getDataValue('owner-id'),
 							'network' => $this->getDataValue('owner-network'),
 							'url'     => $this->getDataValue('owner-link'),
+							'alias'   => $this->getDataValue('owner-alias'),
 						];
 						$this->owner_url = Contact::magicLinkByContact($owner);
 					}

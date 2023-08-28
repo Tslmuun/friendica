@@ -150,7 +150,7 @@ class Register extends BaseModule
 			'$invite_label' => DI::l10n()->t('Your invitation code: '),
 			'$invite_id'    => $invite_id,
 			'$regtitle'     => DI::l10n()->t('Registration'),
-			'$registertext' => BBCode::convert(DI::config()->get('config', 'register_text', '')),
+			'$registertext' => BBCode::convertForUriId(User::getSystemUriId(), DI::config()->get('config', 'register_text', '')),
 			'$fillwith'     => $fillwith,
 			'$fillext'      => $fillext,
 			'$oidlabel'     => $oidlabel,
@@ -298,7 +298,7 @@ class Register extends BaseModule
 
 		$user = $result['user'];
 
-		$base_url = DI::baseUrl();
+		$base_url = (string)DI::baseUrl();
 
 		if ($netpublish && intval(DI::config()->get('config', 'register_policy')) !== self::APPROVE) {
 			$url = $base_url . '/profile/' . $user['nickname'];
