@@ -68,14 +68,14 @@ as the value of $top_child_total (this is done at the end of this file)
 			<div class="hidden-sm hidden-xs contact-photo-wrapper mframe{{if $item.owner_url}} wwfrom{{/if}} p-author h-card">
 				<a class="userinfo click-card u-url" id="wall-item-photo-menu-{{$item.id}}" href="{{$item.profile_url}}">
 					<div class="contact-photo-image-wrapper">
-						<img src="{{$item.thumb}}" class="contact-photo media-object {{$item.sparkle}} p-name u-photo" id="wall-item-photo-{{$item.id}}" alt="{{$item.name}}" />
+						<img src="{{$item.thumb}}" class="contact-photo media-object {{$item.sparkle}} p-name u-photo" id="wall-item-photo-{{$item.id}}" alt="{{$item.name}}"  loading="lazy"/>
 					</div>
 				</a>
 			</div>
 			<div class="hidden-lg hidden-md contact-photo-wrapper mframe{{if $item.owner_url}} wwfrom{{/if}}">
 				<a class="userinfo click-card u-url" id="wall-item-photo-menu-xs-{{$item.id}}" href="{{$item.profile_url}}">
 					<div class="contact-photo-image-wrapper">
-						<img src="{{$item.thumb}}" class="contact-photo-xs media-object {{$item.sparkle}}" id="wall-item-photo-xs-{{$item.id}}" alt="{{$item.name}}" />
+						<img src="{{$item.thumb}}" class="contact-photo-xs media-object {{$item.sparkle}}" id="wall-item-photo-xs-{{$item.id}}" alt="{{$item.name}}"  loading="lazy"/>
 					</div>
 				</a>
 			</div>
@@ -96,7 +96,7 @@ as the value of $top_child_total (this is done at the end of this file)
 			<div class="contact-photo-wrapper mframe{{if $item.owner_url}} wwfrom{{/if}} p-author h-card">
 				<a class="userinfo click-card u-url" id="wall-item-photo-menu-{{$item.id}}" href="{{$item.profile_url}}">
 					<div class="contact-photo-image-wrapper">
-						<img src="{{$item.thumb}}" class="contact-photo-xs media-object {{$item.sparkle}} p-name u-photo" id="wall-item-photo-comment-{{$item.id}}" alt="{{$item.name}}" />
+						<img src="{{$item.thumb}}" class="contact-photo-xs media-object {{$item.sparkle}} p-name u-photo" id="wall-item-photo-comment-{{$item.id}}" alt="{{$item.name}}"  loading="lazy"/>
 					</div>
 				</a>
 			</div>
@@ -117,7 +117,7 @@ as the value of $top_child_total (this is done at the end of this file)
 					<span class="wall-item-network" title="{{$item.app}}">{{$item.network_name}}</span>
 				{{/if}}
 				{{if $item.plink}}	{{*link to the original source of the item *}}
-					<a href="{{$item.plink.href}}" class="plink u-url" aria-label="{{$item.plink.title}}" title="{{$item.plink.title}}">
+					<a href="{{$item.plink.href}}" class="plink u-url" aria-label="{{$item.plink.title}}" title="{{$item.plink.title}}" target="_blank">
 						<i class="fa fa-external-link"></i>
 					</a>
 				{{/if}}
@@ -238,7 +238,7 @@ as the value of $top_child_total (this is done at the end of this file)
 		{{* item content *}}
 		<div class="wall-item-content {{$item.type}}" id="wall-item-content-{{$item.id}}">
 			{{if $item.title}}
-			<span class="wall-item-title" id="wall-item-title-{{$item.id}}"><h4 class="media-heading" dir="auto"><a href="{{$item.plink.href}}" class="{{$item.sparkle}} p-name">{{$item.title}}</a></h4><br /></span>
+			<span class="wall-item-title" id="wall-item-title-{{$item.id}}"><h4 class="media-heading" dir="auto"><a href="{{$item.plink.href}}" class="{{$item.sparkle}} p-name" target="_blank">{{$item.title}}</a></h4><br /></span>
 			{{/if}}
 
 			<div class="wall-item-body e-content {{if !$item.title}}p-name{{/if}}" id="wall-item-body-{{$item.id}}" dir="auto">{{$item.body_html nofilter}}</div>
@@ -381,10 +381,10 @@ as the value of $top_child_total (this is done at the end of this file)
 
                                         {{if $item.ignore}}
                                         <li role="menuitem">
-                                                <a id="ignore-{{$item.id}}" href="javascript:doIgnoreThread({{$item.id}});" class="btn-link {{$item.ignore.classdo}}" title="{{$item.ignore.do}}"><i class="fa fa-eye-slash" aria-hidden="true"></i> {{$item.ignore.do}}</a>
+                                                <a id="ignore-{{$item.id}}" href="javascript:doIgnoreThread({{$item.id}});" class="btn-link {{$item.ignore.classdo}}" title="{{$item.ignore.do}}"><i class="fa fa-bell-slash" aria-hidden="true"></i> {{$item.ignore.do}}</a>
                                         </li>
                                         <li role="menuitem">
-                                                <a id="unignore-{{$item.id}}" href="javascript:doIgnoreThread({{$item.id}});" class="btn-link {{$item.ignore.classundo}}"  title="{{$item.ignore.undo}}"><i class="fa fa-eye" aria-hidden="true"></i> {{$item.ignore.undo}}</a>
+                                                <a id="unignore-{{$item.id}}" href="javascript:doIgnoreThread({{$item.id}});" class="btn-link {{$item.ignore.classundo}}"  title="{{$item.ignore.undo}}"><i class="fa fa-bell" aria-hidden="true"></i> {{$item.ignore.undo}}</a>
                                         </li>
                                         {{/if}}
 
@@ -560,10 +560,10 @@ as the value of $top_child_total (this is done at the end of this file)
 
 							{{if $item.ignore}}
 								<li role="menuitem">
-								<a id="ignore-{{$item.id}}" href="javascript:doIgnoreThread({{$item.id}});" class="btn-link {{$item.ignore.classdo}}" title="{{$item.ignore.do}}"><i class="fa fa-eye-slash" aria-hidden="true"></i> {{$item.ignore.do}}</a>
+								<a id="ignore-{{$item.id}}" href="javascript:doIgnoreThread({{$item.id}});" class="btn-link {{$item.ignore.classdo}}" title="{{$item.ignore.do}}"><i class="fa fa-bell-slash" aria-hidden="true"></i> {{$item.ignore.do}}</a>
 							</li>
 								<li role="menuitem">
-								<a id="unignore-{{$item.id}}" href="javascript:doIgnoreThread({{$item.id}});" class="btn-link {{$item.ignore.classundo}}"  title="{{$item.ignore.undo}}"><i class="fa fa-eye" aria-hidden="true"></i> {{$item.ignore.undo}}</a>
+								<a id="unignore-{{$item.id}}" href="javascript:doIgnoreThread({{$item.id}});" class="btn-link {{$item.ignore.classundo}}"  title="{{$item.ignore.undo}}"><i class="fa fa-bell" aria-hidden="true"></i> {{$item.ignore.undo}}</a>
 							</li>
 							{{/if}}
 

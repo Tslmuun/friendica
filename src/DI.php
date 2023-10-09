@@ -548,6 +548,14 @@ abstract class DI
 	}
 
 	/**
+	 * @return Content\Conversation\Factory\Timeline
+	 */
+	public static function TimelineFactory()
+	{
+		return self::$dice->create(Content\Conversation\Factory\Timeline::class);
+	}
+
+	/**
 	 * @return Contact\Introduction\Repository\Introduction
 	 */
 	public static function intro()
@@ -722,5 +730,10 @@ abstract class DI
 	public static function emailer()
 	{
 		return self::$dice->create(Util\Emailer::class);
+	}
+
+	public static function postMediaRepository(): Content\Post\Repository\PostMedia
+	{
+		return self::$dice->create(Content\Post\Repository\PostMedia::class);
 	}
 }

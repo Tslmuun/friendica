@@ -38,6 +38,7 @@ use Friendica\Database\DBA;
 use Friendica\Model\Contact;
 use Friendica\Model\Item as ItemModel;
 use Friendica\Model\Post;
+use Friendica\Model\Post\Category;
 use Friendica\Model\Tag;
 use Friendica\Model\User;
 use Friendica\Model\Verb;
@@ -56,6 +57,7 @@ use Psr\Log\LoggerInterface;
 
 class Conversation
 {
+	const MODE_CHANNEL       = 'channel';
 	const MODE_COMMUNITY     = 'community';
 	const MODE_CONTACTS      = 'contacts';
 	const MODE_CONTACT_POSTS = 'contact-posts';
@@ -493,7 +495,9 @@ class Conversation
 					. (!empty($_GET['cmin'])      ? '&cmin='      . rawurlencode($_GET['cmin'])      : '')
 					. (!empty($_GET['cmax'])      ? '&cmax='      . rawurlencode($_GET['cmax'])      : '')
 					. (!empty($_GET['file'])      ? '&file='      . rawurlencode($_GET['file'])      : '')
-
+					. (!empty($_GET['channel'])   ? '&channel='   . rawurlencode($_GET['channel'])   : '')
+					. (!empty($_GET['no_sharer']) ? '&no_sharer=' . rawurlencode($_GET['no_sharer']) : '')
+					. (!empty($_GET['accounttype']) ? '&accounttype=' . rawurlencode($_GET['accounttype']) : '')
 					. "'; </script>\r\n";
 			}
 		} elseif ($mode === self::MODE_PROFILE) {
@@ -528,6 +532,17 @@ class Conversation
 				$live_update_div = '<div id="live-display"></div>' . "\r\n"
 					. "<script> var profile_uid = " . ($this->session->getLocalUserId() ?: 0) . ";"
 					. "</script>";
+			}
+		} elseif ($mode === self::MODE_CHANNEL) {
+			$items = $this->addChildren($items, true, $order, $uid, $mode, $ignoredGsids);
+
+			if (!$update) {
+				$live_update_div = '<div id="live-channel"></div>' . "\r\n"
+					. "<script> var profile_uid = -1; var netargs = '" . substr($this->args->getCommand(), 8)
+					. '?f='
+					. (!empty($_GET['no_sharer']) ? '&no_sharer=' . rawurlencode($_GET['no_sharer']) : '')
+					. (!empty($_GET['accounttype']) ? '&accounttype=' . rawurlencode($_GET['accounttype']) : '')
+					. "'; </script>\r\n";
 			}
 		} elseif ($mode === self::MODE_COMMUNITY) {
 			$items = $this->addChildren($items, true, $order, $uid, $mode, $ignoredGsids);
@@ -620,7 +635,7 @@ class Conversation
 				unset($conv_responses['dislike']);
 			}
 
-			if (in_array($mode, [self::MODE_COMMUNITY, self::MODE_CONTACTS, self::MODE_PROFILE])) {
+			if (in_array($mode, [self::MODE_CHANNEL, self::MODE_COMMUNITY, self::MODE_CONTACTS, self::MODE_PROFILE])) {
 				$writable = true;
 			} else {
 				$writable = $items[0]['writable'] || ($items[0]['uid'] == 0) && in_array($items[0]['network'], Protocol::FEDERATED);
@@ -754,7 +769,12 @@ class Conversation
 				$row['direction'] = ['direction' => 6, 'title' => $this->l10n->t('You are following %s.', $row['causer-name'] ?: $row['author-name'])];
 				break;
 			case ItemModel::PR_TAG:
-				$row['direction'] = ['direction' => 4, 'title' => $this->l10n->t('You subscribed to one or more tags in this post.')];
+				$tags = Category::getArrayByURIId($row['uri-id'], $row['uid'], Category::SUBCRIPTION);
+				if (!empty($tags)) {
+					$row['direction'] = ['direction' => 4, 'title' => $this->l10n->t('You subscribed to %s.', implode(', ', $tags))];
+				} else {
+					$row['direction'] = ['direction' => 4, 'title' => $this->l10n->t('You subscribed to one or more tags in this post.')];
+				}
 				break;
 			case ItemModel::PR_ANNOUNCEMENT:
 				if (!empty($row['causer-id']) && $this->pConfig->get($this->session->getLocalUserId(), 'system', 'display_resharer')) {
@@ -912,7 +932,8 @@ class Conversation
 				continue;
 			}
 
-			if (in_array($row['author-gsid'], $ignoredGsids)
+			if (
+				in_array($row['author-gsid'], $ignoredGsids)
 				|| in_array($row['owner-gsid'], $ignoredGsids)
 				|| in_array($row['causer-gsid'], $ignoredGsids)
 			) {
@@ -1003,7 +1024,7 @@ class Conversation
 			$items[$key]['user-collapsed-owner']  = !$always_display && in_array($row['owner-id'], $collapses);
 
 			if (
-				in_array($mode, [self::MODE_COMMUNITY, self::MODE_NETWORK]) &&
+				in_array($mode, [self::MODE_CHANNEL, self::MODE_COMMUNITY, self::MODE_NETWORK]) &&
 				(in_array($row['author-id'], $blocks) || in_array($row['owner-id'], $blocks) || in_array($row['author-id'], $ignores) || in_array($row['owner-id'], $ignores))
 			) {
 				unset($items[$key]);
