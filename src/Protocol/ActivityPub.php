@@ -24,6 +24,7 @@ namespace Friendica\Protocol;
 use Friendica\Core\Logger;
 use Friendica\Core\Protocol;
 use Friendica\Core\System;
+use Friendica\DI;
 use Friendica\Model\APContact;
 use Friendica\Model\Contact;
 use Friendica\Model\User;
@@ -103,19 +104,6 @@ class ActivityPub
 		}
 
 		return $isrequest;
-	}
-
-	/**
-	 * Fetches ActivityPub content from the given url
-	 *
-	 * @param string  $url content url
-	 * @param integer $uid User ID for the signature
-	 * @return array
-	 * @throws \Friendica\Network\HTTPException\InternalServerErrorException
-	 */
-	public static function fetchContent(string $url, int $uid = 0): array
-	{
-		return HTTPSignature::fetch($url, $uid);
 	}
 
 	private static function getAccountType(array $apcontact): int
@@ -216,7 +204,7 @@ class ActivityPub
 	 */
 	public static function fetchOutbox(string $url, int $uid)
 	{
-		$data = self::fetchContent($url, $uid);
+		$data = HTTPSignature::fetch($url, $uid);
 		if (empty($data)) {
 			return;
 		}
@@ -255,7 +243,7 @@ class ActivityPub
 			return [];
 		}
 
-		$data = self::fetchContent($url, $uid);
+		$data = HTTPSignature::fetch($url, $uid);
 		if (empty($data)) {
 			return [];
 		}
@@ -318,7 +306,18 @@ class ActivityPub
 			return false;
 		}
 
-		// @todo Look for user blocked domains
+		$limited = DI::config()->get('system', 'limited_servers');
+		if (!empty($limited)) {
+			$servers = explode(',', str_replace(' ', '', $limited));
+			$host = parse_url($apcontact['baseurl'], PHP_URL_HOST);
+			if (!empty($host) && in_array($host, $servers)) {
+				return false;
+			}
+		}
+
+		if (DI::userGServer()->isIgnoredByUser($uid, $apcontact['gsid'])) {
+			return false;
+		}
 
 		Logger::debug('Server is an accepted requester', ['uid' => $uid, 'id' => $apcontact['gsid'], 'url' => $apcontact['baseurl'], 'signer' => $signer, 'called_by' => $called_by]);
 

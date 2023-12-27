@@ -27,7 +27,6 @@ use Exception;
 use Friendica\Core\Hook;
 use Friendica\Core\Logger;
 use Friendica\Core\Protocol;
-use Friendica\Core\System;
 use Friendica\Database\DBA;
 use Friendica\DI;
 use Friendica\Model\Contact;
@@ -44,6 +43,7 @@ use Friendica\Protocol\Feed;
 use Friendica\Protocol\Salmon;
 use Friendica\Util\Crypto;
 use Friendica\Util\DateTimeFormat;
+use Friendica\Util\HTTPSignature;
 use Friendica\Util\Network;
 use Friendica\Util\Strings;
 use Friendica\Util\XML;
@@ -219,7 +219,7 @@ class Probe
 
 		$xrd_timeout = DI::config()->get('system', 'xrd_timeout', 20);
 
-		Logger::info('Probing', ['host' => $host, 'ssl_url' => $ssl_url, 'url' => $url, 'callstack' => System::callstack(20)]);
+		Logger::info('Probing', ['host' => $host, 'ssl_url' => $ssl_url, 'url' => $url]);
 		$xrd = null;
 
 		$curlResult = DI::httpClient()->get($ssl_url, HttpClientAccept::XRD_XML, [HttpClientOptions::TIMEOUT => $xrd_timeout]);
@@ -1861,7 +1861,7 @@ class Probe
 		unset($baseParts['query']);
 		unset($baseParts['fragment']);
 
-		return Network::unparseURL($baseParts);
+		return Network::unparseURL((array)$baseParts);
 	}
 
 	/**
@@ -2133,7 +2133,7 @@ class Probe
 	 */
 	private static function updateFromOutbox(string $feed, array $data): string
 	{
-		$outbox = ActivityPub::fetchContent($feed);
+		$outbox = HTTPSignature::fetch($feed);
 		if (empty($outbox)) {
 			return '';
 		}

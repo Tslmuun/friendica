@@ -33,7 +33,6 @@ use Friendica\Module\Response;
 use Friendica\Module\Special\HTTPException as ModuleHTTPException;
 use Friendica\Network\HTTPException;
 use Friendica\Util\Profiler;
-use Friendica\Util\XML;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Log\LoggerInterface;
 
@@ -186,6 +185,11 @@ abstract class BaseModule implements ICanHandleRequests
 	{
 		// @see https://github.com/tootsuite/mastodon/blob/c3aef491d66aec743a3a53e934a494f653745b61/config/initializers/cors.rb
 		if (substr($this->args->getQueryString(), 0, 12) == '.well-known/') {
+			$this->response->setHeader('*', 'Access-Control-Allow-Origin');
+			$this->response->setHeader('*', 'Access-Control-Allow-Headers');
+			$this->response->setHeader(Router::GET, 'Access-Control-Allow-Methods');
+			$this->response->setHeader('false', 'Access-Control-Allow-Credentials');
+		} elseif (substr($this->args->getQueryString(), 0, 9) == 'nodeinfo/') {
 			$this->response->setHeader('*', 'Access-Control-Allow-Origin');
 			$this->response->setHeader('*', 'Access-Control-Allow-Headers');
 			$this->response->setHeader(Router::GET, 'Access-Control-Allow-Methods');
@@ -489,7 +493,7 @@ abstract class BaseModule implements ICanHandleRequests
 	public function httpError(int $httpCode, string $message = '', $content = '')
 	{
 		if ($httpCode >= 400) {
-			$this->logger->debug('Exit with error', ['code' => $httpCode, 'message' => $message, 'callstack' => System::callstack(20), 'method' => $this->args->getMethod(), 'agent' => $this->server['HTTP_USER_AGENT'] ?? '']);
+			$this->logger->debug('Exit with error', ['code' => $httpCode, 'message' => $message, 'method' => $this->args->getMethod(), 'agent' => $this->server['HTTP_USER_AGENT'] ?? '']);
 		}
 
 		$this->response->setStatus($httpCode, $message);
@@ -524,7 +528,7 @@ abstract class BaseModule implements ICanHandleRequests
 	public function jsonError(int $httpCode, $content, string $content_type = 'application/json')
 	{
 		if ($httpCode >= 400) {
-			$this->logger->debug('Exit with error', ['code' => $httpCode, 'content_type' => $content_type, 'callstack' => System::callstack(20), 'method' => $this->args->getMethod(), 'agent' => $this->server['HTTP_USER_AGENT'] ?? '']);
+			$this->logger->debug('Exit with error', ['code' => $httpCode, 'content_type' => $content_type, 'method' => $this->args->getMethod(), 'agent' => $this->server['HTTP_USER_AGENT'] ?? '']);
 		}
 
 		$this->response->setStatus($httpCode);

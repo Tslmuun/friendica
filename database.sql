@@ -1,6 +1,6 @@
 -- ------------------------------------------
--- Friendica 2023.09-dev (Giant Rhubarb)
--- DB_UPDATE_VERSION 1534
+-- Friendica 2024.03-dev (Yellow Archangel)
+-- DB_UPDATE_VERSION 1542
 -- ------------------------------------------
 
 
@@ -491,6 +491,25 @@ CREATE TABLE IF NOT EXISTS `cache` (
 	 PRIMARY KEY(`k`),
 	 INDEX `k_expires` (`k`,`expires`)
 ) DEFAULT COLLATE utf8mb4_general_ci COMMENT='Stores temporary data';
+
+--
+-- TABLE channel
+--
+CREATE TABLE IF NOT EXISTS `channel` (
+	`id` int unsigned NOT NULL auto_increment COMMENT '',
+	`uid` mediumint unsigned NOT NULL COMMENT 'User id',
+	`label` varchar(64) NOT NULL COMMENT 'Channel label',
+	`description` varchar(64) COMMENT 'Channel description',
+	`circle` int COMMENT 'Circle or channel that this channel is based on',
+	`access-key` varchar(1) COMMENT 'Access key',
+	`include-tags` varchar(1023) COMMENT 'Comma separated list of tags that will be included in the channel',
+	`exclude-tags` varchar(1023) COMMENT 'Comma separated list of tags that aren\'t allowed in the channel',
+	`full-text-search` varchar(1023) COMMENT 'Full text search pattern, see https://mariadb.com/kb/en/full-text-index-overview/#in-boolean-mode',
+	`media-type` smallint unsigned COMMENT 'Filtered media types',
+	 PRIMARY KEY(`id`),
+	 INDEX `uid` (`uid`),
+	FOREIGN KEY (`uid`) REFERENCES `user` (`uid`) ON UPDATE RESTRICT ON DELETE CASCADE
+) DEFAULT COLLATE utf8mb4_general_ci COMMENT='User defined Channels';
 
 --
 -- TABLE config
@@ -1309,6 +1328,7 @@ CREATE TABLE IF NOT EXISTS `post-engagement` (
 	`contact-type` tinyint NOT NULL DEFAULT 0 COMMENT 'Person, organisation, news, community, relay',
 	`media-type` tinyint NOT NULL DEFAULT 0 COMMENT 'Type of media in a bit array (1 = image, 2 = video, 4 = audio',
 	`language` varbinary(128) COMMENT 'Language information about this post',
+	`searchtext` mediumtext COMMENT 'Simplified text for the full text search',
 	`created` datetime COMMENT '',
 	`restricted` boolean NOT NULL DEFAULT '0' COMMENT 'If true, this post is either unlisted or not from a federated network',
 	`comments` mediumint unsigned COMMENT 'Number of comments',
@@ -1316,6 +1336,7 @@ CREATE TABLE IF NOT EXISTS `post-engagement` (
 	 PRIMARY KEY(`uri-id`),
 	 INDEX `owner-id` (`owner-id`),
 	 INDEX `created` (`created`),
+	 FULLTEXT INDEX `searchtext` (`searchtext`),
 	FOREIGN KEY (`uri-id`) REFERENCES `item-uri` (`id`) ON UPDATE RESTRICT ON DELETE CASCADE,
 	FOREIGN KEY (`owner-id`) REFERENCES `contact` (`id`) ON UPDATE RESTRICT ON DELETE CASCADE
 ) DEFAULT COLLATE utf8mb4_general_ci COMMENT='Engagement data per post';
@@ -1513,7 +1534,8 @@ CREATE TABLE IF NOT EXISTS `post-user` (
 	 INDEX `event-id` (`event-id`),
 	 INDEX `psid` (`psid`),
 	 INDEX `author-id_uid` (`author-id`,`uid`),
-	 INDEX `author-id_received` (`author-id`,`received`),
+	 INDEX `author-id_created` (`author-id`,`created`),
+	 INDEX `owner-id_created` (`owner-id`,`created`),
 	 INDEX `parent-uri-id_uid` (`parent-uri-id`,`uid`),
 	 INDEX `uid_wall_received` (`uid`,`wall`,`received`),
 	 INDEX `uid_contactid` (`uid`,`contact-id`),
@@ -1574,11 +1596,17 @@ CREATE TABLE IF NOT EXISTS `post-thread-user` (
 	 INDEX `post-user-id` (`post-user-id`),
 	 INDEX `commented` (`commented`),
 	 INDEX `received` (`received`),
+	 INDEX `author-id_created` (`author-id`,`created`),
+	 INDEX `owner-id_created` (`owner-id`,`created`),
 	 INDEX `uid_received` (`uid`,`received`),
 	 INDEX `uid_wall_received` (`uid`,`wall`,`received`),
 	 INDEX `uid_commented` (`uid`,`commented`),
+	 INDEX `uid_created` (`uid`,`created`),
 	 INDEX `uid_starred` (`uid`,`starred`),
 	 INDEX `uid_mention` (`uid`,`mention`),
+	 INDEX `contact-id_commented` (`contact-id`,`commented`),
+	 INDEX `contact-id_received` (`contact-id`,`received`),
+	 INDEX `contact-id_created` (`contact-id`,`created`),
 	FOREIGN KEY (`uri-id`) REFERENCES `item-uri` (`id`) ON UPDATE RESTRICT ON DELETE CASCADE,
 	FOREIGN KEY (`conversation-id`) REFERENCES `item-uri` (`id`) ON UPDATE RESTRICT ON DELETE CASCADE,
 	FOREIGN KEY (`owner-id`) REFERENCES `contact` (`id`) ON UPDATE RESTRICT ON DELETE RESTRICT,
@@ -1847,6 +1875,16 @@ CREATE TABLE IF NOT EXISTS `subscription` (
 ) DEFAULT COLLATE utf8mb4_general_ci COMMENT='Push Subscription for the API';
 
 --
+-- TABLE check-full-text-search
+--
+CREATE TABLE IF NOT EXISTS `check-full-text-search` (
+	`pid` int unsigned NOT NULL COMMENT 'The ID of the process',
+	`searchtext` mediumtext COMMENT 'Simplified text for the full text search',
+	 PRIMARY KEY(`pid`),
+	 FULLTEXT INDEX `searchtext` (`searchtext`)
+) DEFAULT COLLATE utf8mb4_general_ci COMMENT='Check for a full text search match in user defined channels before storing the message in the system';
+
+--
 -- TABLE userd
 --
 CREATE TABLE IF NOT EXISTS `userd` (
@@ -1971,6 +2009,51 @@ CREATE VIEW `circle-member-view` AS SELECT
 			INNER JOIN `group` ON `group_member`.`gid` = `group`.`id`;
 
 --
+-- VIEW post-timeline-view
+--
+DROP VIEW IF EXISTS `post-timeline-view`;
+CREATE VIEW `post-timeline-view` AS SELECT 
+	`post-user`.`uid` AS `uid`,
+	`post-user`.`uri-id` AS `uri-id`,
+	`post-user`.`gravity` AS `gravity`,
+	`post-user`.`created` AS `created`,
+	`post-user`.`edited` AS `edited`,
+	`post-thread-user`.`commented` AS `commented`,
+	`post-user`.`received` AS `received`,
+	`post-thread-user`.`changed` AS `changed`,
+	`post-user`.`private` AS `private`,
+	`post-user`.`visible` AS `visible`,
+	`post-user`.`deleted` AS `deleted`,
+	`post-user`.`origin` AS `origin`,
+	`post-user`.`global` AS `global`,
+	`post-user`.`network` AS `network`,
+	`post-user`.`protocol` AS `protocol`,
+	`post-user`.`vid` AS `vid`,
+	`post-user`.`contact-id` AS `contact-id`,
+	`contact`.`blocked` AS `contact-blocked`,
+	`contact`.`readonly` AS `contact-readonly`,
+	`contact`.`pending` AS `contact-pending`,
+	`contact`.`rel` AS `contact-rel`,
+	`contact`.`uid` AS `contact-uid`,
+	`contact`.`self` AS `self`,
+	`post-user`.`author-id` AS `author-id`,
+	`author`.`blocked` AS `author-blocked`,
+	`author`.`hidden` AS `author-hidden`,
+	`author`.`gsid` AS `author-gsid`,
+	`post-user`.`owner-id` AS `owner-id`,
+	`owner`.`blocked` AS `owner-blocked`,
+	`owner`.`gsid` AS `owner-gsid`,
+	`post-user`.`causer-id` AS `causer-id`,
+	`causer`.`blocked` AS `causer-blocked`,
+	`causer`.`gsid` AS `causer-gsid`
+	FROM `post-user`
+			LEFT JOIN `post-thread-user` ON `post-thread-user`.`uri-id` = `post-user`.`parent-uri-id` AND `post-thread-user`.`uid` = `post-user`.`uid`
+			STRAIGHT_JOIN `contact` ON `contact`.`id` = `post-user`.`contact-id`
+			STRAIGHT_JOIN `contact` AS `author` ON `author`.`id` = `post-user`.`author-id`
+			STRAIGHT_JOIN `contact` AS `owner` ON `owner`.`id` = `post-user`.`owner-id`
+			LEFT JOIN `contact` AS `causer` ON `causer`.`id` = `post-user`.`causer-id`;
+
+--
 -- VIEW post-user-view
 --
 DROP VIEW IF EXISTS `post-user-view`;
@@ -2070,6 +2153,7 @@ CREATE VIEW `post-user-view` AS SELECT
 	`author`.`blocked` AS `author-blocked`,
 	`author`.`hidden` AS `author-hidden`,
 	`author`.`updated` AS `author-updated`,
+	`author`.`contact-type` AS `author-contact-type`,
 	`author`.`gsid` AS `author-gsid`,
 	`author`.`baseurl` AS `author-baseurl`,
 	`post-user`.`owner-id` AS `owner-id`,
@@ -2254,6 +2338,7 @@ CREATE VIEW `post-thread-user-view` AS SELECT
 	`author`.`blocked` AS `author-blocked`,
 	`author`.`hidden` AS `author-hidden`,
 	`author`.`updated` AS `author-updated`,
+	`author`.`contact-type` AS `author-contact-type`,
 	`author`.`gsid` AS `author-gsid`,
 	`post-thread-user`.`owner-id` AS `owner-id`,
 	`owner`.`uri-id` AS `owner-uri-id`,
@@ -2422,6 +2507,7 @@ CREATE VIEW `post-view` AS SELECT
 	`author`.`blocked` AS `author-blocked`,
 	`author`.`hidden` AS `author-hidden`,
 	`author`.`updated` AS `author-updated`,
+	`author`.`contact-type` AS `author-contact-type`,
 	`author`.`gsid` AS `author-gsid`,
 	`post`.`owner-id` AS `owner-id`,
 	`owner`.`uri-id` AS `owner-uri-id`,
@@ -2567,6 +2653,7 @@ CREATE VIEW `post-thread-view` AS SELECT
 	`author`.`blocked` AS `author-blocked`,
 	`author`.`hidden` AS `author-hidden`,
 	`author`.`updated` AS `author-updated`,
+	`author`.`contact-type` AS `author-contact-type`,
 	`author`.`gsid` AS `author-gsid`,
 	`post-thread`.`owner-id` AS `owner-id`,
 	`owner`.`uri-id` AS `owner-uri-id`,

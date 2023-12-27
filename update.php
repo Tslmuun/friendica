@@ -1390,3 +1390,24 @@ function update_1531()
 
 	return Update::SUCCESS;
 }
+
+function update_1535()
+{
+	if (DI::config()->get('system', 'compute_group_counts')) {
+		DI::config()->set('system', 'compute_circle_counts', true);
+	}
+	DI::config()->delete('system', 'compute_group_counts');
+	
+	return Update::SUCCESS;
+}
+
+function update_1539()
+{
+	$users = DBA::select('user', ['uid'], ['account-type' => User::ACCOUNT_TYPE_COMMUNITY]);
+	while ($user = DBA::fetch($users)) {
+		User::setCommunityUserSettings($user['uid']);
+	}
+	DBA::close($users);
+
+	return Update::SUCCESS;
+}

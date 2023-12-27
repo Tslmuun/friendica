@@ -21,6 +21,7 @@
 
 namespace Friendica\Model\Post;
 
+use Friendica\Content\Text\BBCode;
 use Friendica\Core\Logger;
 use Friendica\Core\Protocol;
 use Friendica\Database\Database;
@@ -32,13 +33,14 @@ use Friendica\Model\Post;
 use Friendica\Model\Tag;
 use Friendica\Model\Verb;
 use Friendica\Protocol\Activity;
+use Friendica\Protocol\ActivityPub\Receiver;
 use Friendica\Protocol\Relay;
 use Friendica\Util\DateTimeFormat;
 
-// Channel
-
 class Engagement
 {
+	const KEYWORDS = ['source', 'server', 'from', 'to', 'group', 'tag', 'network', 'platform', 'visibility'];
+
 	/**
 	 * Store engagement data from an item array
 	 *
@@ -52,9 +54,11 @@ class Engagement
 			return;
 		}
 
-		$parent = Post::selectFirst(['created', 'owner-id', 'uid', 'private', 'contact-contact-type', 'language'], ['uri-id' => $item['parent-uri-id']]);
+		$parent = Post::selectFirst(['uri-id', 'created', 'author-id', 'owner-id', 'uid', 'private', 'contact-contact-type', 'language', 'network',
+			'title', 'content-warning', 'body', 'author-contact-type', 'author-nick', 'author-addr', 'author-gsid', 'owner-contact-type', 'owner-nick', 'owner-addr', 'owner-gsid'],
+			['uri-id' => $item['parent-uri-id']]);
 
-		if ($parent['created'] < DateTimeFormat::utc('now - ' . DI::config()->get('channel', 'engagement_hours') . ' hour')) {
+		if ($parent['created'] < self::getCreationDateLimit(false)) {
 			Logger::debug('Post is too old', ['uri-id' => $item['uri-id'], 'parent-uri-id' => $item['parent-uri-id'], 'created' => $parent['created']]);
 			return;
 		}
@@ -78,7 +82,15 @@ class Engagement
 		$mediatype = self::getMediaType($item['parent-uri-id']);
 
 		if (!$store) {
-			$mediatype = !empty($mediatype);
+			$store = !empty($mediatype);
+		}
+
+		$searchtext = self::getSearchTextForItem($parent);
+		if (!$store) {
+			$content   = trim(($parent['title'] ?? '') . ' ' . ($parent['content-warning'] ?? '') . ' ' . ($parent['body'] ?? ''));
+			$languages = Item::getLanguageArray($content, 1, 0, $parent['author-id']);
+			$language  = !empty($languages) ? array_key_first($languages) : '';
+			$store     = DI::userDefinedChannel()->match($searchtext, $language);
 		}
 
 		$engagement = [
@@ -87,6 +99,7 @@ class Engagement
 			'contact-type' => $parent['contact-contact-type'],
 			'media-type'   => $mediatype,
 			'language'     => $parent['language'],
+			'searchtext'   => $searchtext,
 			'created'      => $parent['created'],
 			'restricted'   => !in_array($item['network'], Protocol::FEDERATED) || ($parent['private'] != Item::PUBLIC),
 			'comments'     => DBA::count('post', ['parent-uri-id' => $item['parent-uri-id'], 'gravity' => Item::GRAVITY_COMMENT]),
@@ -102,6 +115,127 @@ class Engagement
 		}
 		$ret = DBA::insert('post-engagement', $engagement, Database::INSERT_UPDATE);
 		Logger::debug('Engagement stored', ['fields' => $engagement, 'ret' => $ret]);
+	}
+
+	public static function getSearchTextForActivity(string $content, int $author_id, array $tags, array $receivers): string
+	{
+		$author = Contact::getById($author_id);
+
+		$item = [
+			'uri-id'              => 0,
+			'network'             => Protocol::ACTIVITYPUB,
+			'title'               => '',
+			'content-warning'     => '',
+			'body'                => $content,
+			'private'             => Item::PRIVATE,
+			'author-id'           => $author_id,
+			'author-contact-type' => $author['contact-type'],
+			'author-nick'         => $author['nick'],
+			'author-addr'         => $author['addr'],
+			'author-gsid'         => $author['gsid'],
+			'owner-id'            => $author_id,
+			'owner-contact-type'  => $author['contact-type'],
+			'owner-nick'          => $author['nick'],
+			'owner-addr'          => $author['addr'],
+			'author-gsid'         => $author['gsid'],
+		];
+
+		foreach ($receivers as $receiver) {
+			if ($receiver == Receiver::PUBLIC_COLLECTION) {
+				$item['private'] = Item::PUBLIC;
+			}
+		}
+
+		return self::getSearchText($item, $receivers, $tags);
+	}
+
+	private static function getSearchTextForItem(array $item): string
+	{
+		$receivers = array_column(Tag::getByURIId($item['uri-id'], [Tag::MENTION, Tag::IMPLICIT_MENTION, Tag::EXCLUSIVE_MENTION, Tag::AUDIENCE]), 'url');
+		$tags      = array_column(Tag::getByURIId($item['uri-id'], [Tag::HASHTAG]), 'name');
+		return self::getSearchText($item, $receivers, $tags);
+	}
+
+	private static function getSearchText(array $item, array $receivers, array $tags): string
+	{
+		$body = '[nosmile]network:' . $item['network'];
+
+		if (!empty($item['author-gsid'])) {
+			$gserver = DBA::selectFirst('gserver', ['platform', 'nurl'], ['id' => $item['author-gsid']]);
+			$platform = preg_replace( '/[\W]/', '', $gserver['platform'] ?? '');
+			if (!empty($platform)) {
+				$body .= ' platform:' . $platform;
+			}
+			$body .= ' server:' . parse_url($gserver['nurl'], PHP_URL_HOST);
+		}
+
+		if (($item['owner-contact-type'] == Contact::TYPE_COMMUNITY) && !empty($item['owner-gsid']) && ($item['owner-gsid'] != ($item['author-gsid'] ?? 0))) {
+			$gserver = DBA::selectFirst('gserver', ['platform', 'nurl'], ['id' => $item['owner-gsid']]);
+			$platform = preg_replace( '/[\W]/', '', $gserver['platform'] ?? '');
+			if (!empty($platform) && !strpos($body, 'platform:' . $platform)) {
+				$body .= ' platform:' . $platform;
+			}
+			$body .= ' server:' . parse_url($gserver['nurl'], PHP_URL_HOST);
+		}
+
+		switch ($item['private']) {
+			case Item::PUBLIC:
+				$body .= ' visibility:public';
+				break;
+			case Item::UNLISTED:
+				$body .= ' visibility:unlisted';
+				break;
+			case Item::PRIVATE:
+				$body .= ' visibility:private';
+				break;
+		}
+
+		if (in_array(Contact::TYPE_COMMUNITY, [$item['author-contact-type'], $item['owner-contact-type']])) {
+			$body .= ' source:group';
+		} elseif ($item['author-contact-type'] == Contact::TYPE_PERSON) {
+			$body .= ' source:person';
+		} elseif ($item['author-contact-type'] == Contact::TYPE_NEWS) {
+			$body .= ' source:service';
+		} elseif ($item['author-contact-type'] == Contact::TYPE_ORGANISATION) {
+			$body .= ' source:organization';
+		} elseif ($item['author-contact-type'] == Contact::TYPE_RELAY) {
+			$body .= ' source:application';
+		}
+
+		if ($item['author-contact-type'] == Contact::TYPE_COMMUNITY) {
+			$body .= ' group:' . $item['author-nick'] . ' group:' . $item['author-addr'];
+		} elseif (in_array($item['author-contact-type'], [Contact::TYPE_PERSON, Contact::TYPE_NEWS, Contact::TYPE_ORGANISATION])) {
+			$body .= ' from:' . $item['author-nick'] . ' from:' . $item['author-addr'];
+		}
+
+		if ($item['author-id'] !=  $item['owner-id']) {
+			if ($item['owner-contact-type'] == Contact::TYPE_COMMUNITY) {
+				$body .= ' group:' . $item['owner-nick'] . ' group:' . $item['owner-addr'];
+			} elseif (in_array($item['owner-contact-type'], [Contact::TYPE_PERSON, Contact::TYPE_NEWS, Contact::TYPE_ORGANISATION])) {
+				$body .= ' from:' . $item['owner-nick'] . ' from:' . $item['owner-addr'];
+			}
+		}
+
+		foreach ($receivers as $receiver) {
+			$contact = Contact::getByURL($receiver, false, ['nick', 'addr', 'contact-type']);
+			if (empty($contact)) {
+				continue;
+			}
+
+			if (($contact['contact-type'] == Contact::TYPE_COMMUNITY) && !strpos($body, 'group:' . $contact['addr'])) {
+				$body .= ' group:' . $contact['nick'] . ' group:' . $contact['addr'];
+			} elseif (in_array($contact['contact-type'], [Contact::TYPE_PERSON, Contact::TYPE_NEWS, Contact::TYPE_ORGANISATION])) {
+				$body .= ' to:' . $contact['nick'] . ' to:' . $contact['addr'];
+			}
+		}
+
+		foreach ($tags as $tag) {
+			$body .= ' tag:' . $tag;
+		}
+
+		$body .= ' ' . $item['title'] . ' ' . $item['content-warning'] . ' ' . $item['body'];
+
+		return BBCode::toSearchText($body, $item['uri-id']);
 	}
 
 	private static function getMediaType(int $uri_id): int
@@ -127,7 +261,27 @@ class Engagement
 	 */
 	public static function expire()
 	{
-		DBA::delete('post-engagement', ["`created` < ?", DateTimeFormat::utc('now - ' . DI::config()->get('channel', 'engagement_hours') . ' hour')]);
-		Logger::notice('Cleared expired engagements', ['rows' => DBA::affectedRows()]);
+		$limit = self::getCreationDateLimit(true);
+		if (empty($limit)) {
+			Logger::notice('Expiration limit not reached');
+			return;
+		}
+		DBA::delete('post-engagement', ["`created` < ?", $limit]);
+		Logger::notice('Cleared expired engagements', ['limit' => $limit, 'rows' => DBA::affectedRows()]);
+	}
+
+	private static function getCreationDateLimit(bool $forDeletion): string
+	{
+		$posts = DI::config()->get('channel', 'engagement_post_limit');
+		if (!empty($posts)) {
+			$limit = DBA::selectToArray('post-engagement', ['created'], [], ['limit' => [$posts, 1], 'order' => ['created' => true]]);
+			if (!empty($limit)) {
+				return $limit[0]['created'];
+			} elseif ($forDeletion) {
+				return '';
+			}
+		}
+
+		return DateTimeFormat::utc('now - ' . DI::config()->get('channel', 'engagement_hours') . ' hour');
 	}
 }

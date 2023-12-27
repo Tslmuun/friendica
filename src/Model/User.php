@@ -37,11 +37,10 @@ use Friendica\Database\DBA;
 use Friendica\DI;
 use Friendica\Module;
 use Friendica\Network\HTTPClient\Client\HttpClientAccept;
-use Friendica\Network\HTTPException\InternalServerErrorException;
-use Friendica\Security\TwoFactor\Model\AppSpecificPassword;
 use Friendica\Network\HTTPException;
 use Friendica\Object\Image;
 use Friendica\Protocol\Delivery;
+use Friendica\Security\TwoFactor\Model\AppSpecificPassword;
 use Friendica\Util\Crypto;
 use Friendica\Util\DateTimeFormat;
 use Friendica\Util\Images;
@@ -128,7 +127,6 @@ class User
 
 			case 'community':
 				return User::ACCOUNT_TYPE_COMMUNITY;
-
 		}
 		return null;
 	}
@@ -345,6 +343,35 @@ class User
 	}
 
 	/**
+	 * Set static settings for community user accounts
+	 *
+	 * @param integer $uid
+	 * @return void
+	 */
+	public static function setCommunityUserSettings(int $uid)
+	{
+		$user = self::getById($uid, ['account-type', 'page-flags']);
+		if ($user['account-type'] != User::ACCOUNT_TYPE_COMMUNITY) {
+			return;
+		}
+
+		DI::pConfig()->set($uid, 'system', 'unlisted', true);
+
+		$fields = [
+			'allow_cid'  => '',
+			'allow_gid'  => $user['page-flags'] == User::PAGE_FLAGS_PRVGROUP ? '<' . Circle::FOLLOWERS . '>' : '',
+			'deny_cid'   => '',
+			'deny_gid'   => '',
+			'blockwall'  => true,
+			'blocktags'  => true,
+		];
+
+		User::update($fields, $uid);
+
+		Profile::update(['hide-friends' => true], $uid);
+	}
+
+	/**
 	 * Returns the user id of a given profile URL
 	 *
 	 * @param string $url
@@ -397,7 +424,7 @@ class User
 	 * @return array user
 	 * @throws Exception
 	 */
-	public static function getFirstAdmin(array $fields = []) : array
+	public static function getFirstAdmin(array $fields = []): array
 	{
 		if (!empty(DI::config()->get('config', 'admin_nickname'))) {
 			return self::getByNickname(DI::config()->get('config', 'admin_nickname'), $fields);
@@ -532,22 +559,90 @@ class User
 		return $default_circle;
 	}
 
-/**
- * Fetch the language code from the given user. If the code is invalid, return the system language
- *
- * @param integer $uid User-Id
- * @return string
- */
+	/**
+	 * Fetch the language code from the given user. If the code is invalid, return the system language
+	 *
+	 * @param integer $uid User-Id
+	 * @return string
+	 */
 	public static function getLanguageCode(int $uid): string
 	{
 		$owner = self::getOwnerDataById($uid);
-		$languages = DI::l10n()->getAvailableLanguages(true);
-		if (in_array($owner['language'], array_keys($languages))) {
-			$language = $owner['language'];
-		} else {
-			$language = DI::config()->get('system', 'language');
+		if (!empty($owner['language'])) {
+			$language = DI::l10n()->toISO6391($owner['language']);
+			if (in_array($language, array_keys(DI::l10n()->getLanguageCodes()))) {
+				return $language;
+			}
 		}
-		return $language;
+		return DI::l10n()->toISO6391(DI::config()->get('system', 'language'));
+	}
+
+	/**
+	 * Fetch the wanted languages for a given user
+	 *
+	 * @param integer $uid
+	 * @return array
+	 */
+	public static function getWantedLanguages(int $uid): array
+	{
+		return DI::pConfig()->get($uid, 'channel', 'languages', [User::getLanguageCode($uid)]) ?? [];
+	}
+
+	/**
+	 * Get a list of all languages that are used by the users
+	 *
+	 * @return array
+	 */
+	public static function getLanguages(): array
+	{
+		$cachekey  = 'user:getLanguages';
+		$languages = DI::cache()->get($cachekey);
+		if (!is_null($languages)) {
+			return $languages;
+		}
+
+		$supported = array_keys(DI::l10n()->getLanguageCodes());
+		$languages = [];
+		$uids      = [];
+
+		$condition = ["`verified` AND NOT `blocked` AND NOT `account_removed` AND NOT `account_expired` AND `uid` > ?", 0];
+
+		$abandon_days = intval(DI::config()->get('system', 'account_abandon_days'));
+		if (!empty($abandon_days)) {
+			$condition = DBA::mergeConditions($condition, ["`last-activity` > ?", DateTimeFormat::utc('now - ' . $abandon_days . ' days')]);
+		}
+
+		$users = DBA::select('user', ['uid', 'language'], $condition);
+		while ($user = DBA::fetch($users)) {
+			$uids[] = $user['uid'];
+			$code = DI::l10n()->toISO6391($user['language']);
+			if (!in_array($code, $supported)) {
+				continue;
+			}
+			$languages[$code] = $code;
+		}
+		DBA::close($users);
+
+		$channels = DBA::select('pconfig', ['uid', 'v'], ["`cat` = ? AND `k` = ? AND `v` != ?", 'channel', 'languages', '']);
+		while ($channel = DBA::fetch($channels)) {
+			if (!in_array($channel['uid'], $uids)) {
+				continue;
+			}
+			$values = unserialize($channel['v']);
+			if (!empty($values) && is_array($values)) {
+				foreach ($values as $language) {
+					$language = DI::l10n()->toISO6391($language);
+					$languages[$language] = $language;
+				}
+			}
+		}
+		DBA::close($channels);
+
+		ksort($languages);
+		$languages = array_keys($languages);
+		DI::cache()->set($cachekey, $languages);
+
+		return $languages;
 	}
 
 	/**
@@ -963,7 +1058,7 @@ class User
 	public static function getAvatarUrl(array $user, string $size = ''): string
 	{
 		if (empty($user['nickname'])) {
-			DI::logger()->warning('Missing user nickname key', ['trace' => System::callstack(20)]);
+			DI::logger()->warning('Missing user nickname key');
 		}
 
 		$url = DI::baseUrl() . '/photo/';
@@ -1005,7 +1100,7 @@ class User
 	public static function getBannerUrl(array $user): string
 	{
 		if (empty($user['nickname'])) {
-			DI::logger()->warning('Missing user nickname key', ['trace' => System::callstack(20)]);
+			DI::logger()->warning('Missing user nickname key');
 		}
 
 		$url = DI::baseUrl() . '/photo/banner/';
@@ -1132,7 +1227,7 @@ class User
 			throw new Exception(DI::l10n()->tt('Username should be at most %s character.', 'Username should be at most %s characters.', $username_max_length));
 		}
 
-		// So now we are just looking for a space in the full name.
+		// So now we are just looking for a space in the display name.
 		$loose_reg = DI::config()->get('system', 'no_regfullname');
 		if (!$loose_reg) {
 			$username = mb_convert_case($username, MB_CASE_TITLE, 'UTF-8');
@@ -1452,7 +1547,7 @@ class User
 		Photo::delete(['uid' => $register['uid']]);
 
 		return DBA::delete('user', ['uid' => $register['uid']]) &&
-		       Register::deleteByHash($register['hash']);
+			Register::deleteByHash($register['hash']);
 	}
 
 	/**
@@ -1502,10 +1597,9 @@ class User
 		You may also wish to add some basic information to your default profile
 		(on the "Profiles" page) so that other people can easily find you.
 
-		We recommend setting your full name, adding a profile photo,
-		adding some profile "keywords" (very useful in making new friends) - and
-		perhaps what country you live in; if you do not wish to be more specific
-		than that.
+		We recommend adding a profile photo, adding some profile "keywords" 
+		(very useful in making new friends) - and perhaps what country you live in; 
+		if you do not wish to be more specific than that.
 
 		We fully respect your right to privacy, and none of these items are necessary.
 		If you are new and do not know anybody here, they may help
@@ -1606,10 +1700,9 @@ class User
 			You may also wish to add some basic information to your default profile
 			' . "\x28" . 'on the "Profiles" page' . "\x29" . ' so that other people can easily find you.
 
-			We recommend setting your full name, adding a profile photo,
-			adding some profile "keywords" ' . "\x28" . 'very useful in making new friends' . "\x29" . ' - and
-			perhaps what country you live in; if you do not wish to be more specific
-			than that.
+			We recommend adding a profile photo, adding some profile "keywords" ' . "\x28" . 'very useful
+			in making new friends' . "\x29" . ' - and perhaps what country you live in; if you do not wish
+			to be more specific than that.
 
 			We fully respect your right to privacy, and none of these items are necessary.
 			If you are new and do not know anybody here, they may help
@@ -1638,16 +1731,24 @@ class User
 	 * @param int $uid user to remove
 	 * @return bool
 	 * @throws HTTPException\InternalServerErrorException
+	 * @throws HTTPException\NotFoundException
 	 */
 	public static function remove(int $uid): bool
 	{
 		if (empty($uid)) {
-			return false;
+			throw new \InvalidArgumentException('uid needs to be greater than 0');
 		}
 
 		Logger::notice('Removing user', ['user' => $uid]);
 
-		$user = DBA::selectFirst('user', [], ['uid' => $uid]);
+		$user = self::getById($uid);
+		if (!$user) {
+			throw new HTTPException\NotFoundException('User not found with uid: ' . $uid);
+		}
+
+		if (DBA::exists('user', ['parent-uid' => $uid])) {
+			throw new \RuntimeException(DI::l10n()->t("User with delegates can't be removed, please remove delegate users first"));
+		}
 
 		Hook::callAll('remove_user', $user);
 

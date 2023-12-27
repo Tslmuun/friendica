@@ -25,7 +25,8 @@ use Friendica\App;
 use Friendica\App\Mode;
 use Friendica\BaseModule;
 use Friendica\Content\Conversation\Collection\Timelines;
-use Friendica\Content\Conversation\Entity\Timeline as TimelineEntity;
+use Friendica\Content\Conversation\Entity\Channel as ChannelEntity;
+use Friendica\Content\Conversation\Repository\UserDefinedChannel;
 use Friendica\Core\Cache\Capability\ICanCache;
 use Friendica\Core\Cache\Enum\Duration;
 use Friendica\Core\Config\Capability\IManageConfigValues;
@@ -39,6 +40,7 @@ use Friendica\Database\Database;
 use Friendica\Database\DBA;
 use Friendica\Model\Item;
 use Friendica\Model\Post;
+use Friendica\Model\Post\Engagement;
 use Friendica\Module\Response;
 use Friendica\Util\DateTimeFormat;
 use Friendica\Util\Profiler;
@@ -66,6 +68,8 @@ class Timeline extends BaseModule
 	protected $force;
 	/** @var bool */
 	protected $update;
+	/** @var bool */
+	protected $raw;
 
 	/** @var App\Mode $mode */
 	protected $mode;
@@ -79,17 +83,20 @@ class Timeline extends BaseModule
 	protected $config;
 	/** @var ICanCache */
 	protected $cache;
+	/** @var UserDefinedChannel */
+	protected $channelRepository;
 
-	public function __construct(Mode $mode, IHandleUserSessions $session, Database $database, IManagePersonalConfigValues $pConfig, IManageConfigValues $config, ICanCache $cache, L10n $l10n, App\BaseURL $baseUrl, App\Arguments $args, LoggerInterface $logger, Profiler $profiler, Response $response, array $server, array $parameters = [])
+	public function __construct(UserDefinedChannel $channel, Mode $mode, IHandleUserSessions $session, Database $database, IManagePersonalConfigValues $pConfig, IManageConfigValues $config, ICanCache $cache, L10n $l10n, App\BaseURL $baseUrl, App\Arguments $args, LoggerInterface $logger, Profiler $profiler, Response $response, array $server, array $parameters = [])
 	{
 		parent::__construct($l10n, $baseUrl, $args, $logger, $profiler, $response, $server, $parameters);
 
-		$this->mode     = $mode;
-		$this->session  = $session;
-		$this->database = $database;
-		$this->pConfig  = $pConfig;
-		$this->config   = $config;
-		$this->cache    = $cache;
+		$this->channelRepository = $channel;
+		$this->mode              = $mode;
+		$this->session           = $session;
+		$this->database          = $database;
+		$this->pConfig           = $pConfig;
+		$this->config            = $config;
+		$this->cache             = $cache;
 	}
 
 	/**
@@ -135,6 +142,7 @@ class Timeline extends BaseModule
 		$this->noSharer = !empty($request['no_sharer']);
 		$this->force    = !empty($request['force']) && !empty($request['item']);
 		$this->update   = !empty($request['force']) && !empty($request['first_received']) && !empty($request['first_created']) && !empty($request['first_uriid']) && !empty($request['first_commented']);
+		$this->raw      = !empty($request['mode']) && ($request['mode'] == 'raw');
 	}
 
 	protected function getNoSharerWidget(string $base): string
@@ -176,6 +184,7 @@ class Timeline extends BaseModule
 				$path = $tab->path ?? $prefix . '/' . $tab->code;
 			}
 			$tabs[$tab->code] = [
+				'code'      => $tab->code,
 				'label'     => $tab->label,
 				'url'       => $path,
 				'sel'       => $this->selectedTab == $tab->code ? 'active' : '',
@@ -264,13 +273,13 @@ class Timeline extends BaseModule
 	{
 		$uid = $this->session->getLocalUserId();
 
-		if ($this->selectedTab == TimelineEntity::WHATSHOT) {
+		if ($this->selectedTab == ChannelEntity::WHATSHOT) {
 			if (!is_null($this->accountType)) {
 				$condition = ["(`comments` > ? OR `activities` > ?) AND `contact-type` = ?", $this->getMedianComments($uid, 4), $this->getMedianActivities($uid, 4), $this->accountType];
 			} else {
 				$condition = ["(`comments` > ? OR `activities` > ?) AND `contact-type` != ?", $this->getMedianComments($uid, 4), $this->getMedianActivities($uid, 4), Contact::TYPE_COMMUNITY];
 			}
-		} elseif ($this->selectedTab == TimelineEntity::FORYOU) {
+		} elseif ($this->selectedTab == ChannelEntity::FORYOU) {
 			$cid = Contact::getPublicIdByUserId($uid);
 
 			$condition = [
@@ -280,9 +289,9 @@ class Timeline extends BaseModule
 				$cid, $this->getMedianRelationThreadScore($cid, 4), $this->getMedianComments($uid, 4), $this->getMedianActivities($uid, 4), $cid,
 				$uid, Contact\User::FREQUENCY_ALWAYS
 			];
-		} elseif ($this->selectedTab == TimelineEntity::FOLLOWERS) {
+		} elseif ($this->selectedTab == ChannelEntity::FOLLOWERS) {
 			$condition = ["`owner-id` IN (SELECT `pid` FROM `account-user-view` WHERE `uid` = ? AND `rel` = ?)", $uid, Contact::FOLLOWER];
-		} elseif ($this->selectedTab == TimelineEntity::SHARERSOFSHARERS) {
+		} elseif ($this->selectedTab == ChannelEntity::SHARERSOFSHARERS) {
 			$cid = Contact::getPublicIdByUserId($uid);
 
 			// @todo Suggest posts from contacts that are followed most by our followers
@@ -292,17 +301,19 @@ class Timeline extends BaseModule
 				AND NOT `cid` IN (SELECT `cid` FROM `contact-relation` WHERE `follows` AND `relation-cid` = ?))",
 				DateTimeFormat::utc('now - ' . $this->config->get('channel', 'sharer_interaction_days') . ' day'), $cid, $this->getMedianRelationThreadScore($cid, 4), $cid
 			];
-		} elseif ($this->selectedTab == TimelineEntity::IMAGE) {
+		} elseif ($this->selectedTab == ChannelEntity::IMAGE) {
 			$condition = ["`media-type` & ?", 1];
-		} elseif ($this->selectedTab == TimelineEntity::VIDEO) {
+		} elseif ($this->selectedTab == ChannelEntity::VIDEO) {
 			$condition = ["`media-type` & ?", 2];
-		} elseif ($this->selectedTab == TimelineEntity::AUDIO) {
+		} elseif ($this->selectedTab == ChannelEntity::AUDIO) {
 			$condition = ["`media-type` & ?", 4];
-		} elseif ($this->selectedTab == TimelineEntity::LANGUAGE) {
-			$condition = ["JSON_EXTRACT(JSON_KEYS(language), '$[0]') = ?", $this->l10n->convertCodeForLanguageDetection(User::getLanguageCode($uid))];
+		} elseif ($this->selectedTab == ChannelEntity::LANGUAGE) {
+			$condition = ["JSON_EXTRACT(JSON_KEYS(language), '$[0]') = ?", User::getLanguageCode($uid)];
+		} elseif (is_numeric($this->selectedTab)) {
+			$condition = $this->getUserChannelConditions($this->selectedTab, $this->session->getLocalUserId());
 		}
 
-		if ($this->selectedTab != TimelineEntity::LANGUAGE) {
+		if ($this->selectedTab != ChannelEntity::LANGUAGE) {
 			$condition = $this->addLanguageCondition($uid, $condition);
 		}
 
@@ -310,7 +321,7 @@ class Timeline extends BaseModule
 
 		$condition = DBA::mergeConditions($condition, ["NOT EXISTS(SELECT `cid` FROM `user-contact` WHERE `uid` = ? AND `cid` = `post-engagement`.`owner-id` AND (`ignored` OR `blocked` OR `collapsed` OR `is-blocked` OR `channel-frequency` = ?))", $uid, Contact\User::FREQUENCY_NEVER]);
 
-		if (($this->selectedTab != TimelineEntity::WHATSHOT) && !is_null($this->accountType)) {
+		if (($this->selectedTab != ChannelEntity::WHATSHOT) && !is_null($this->accountType)) {
 			$condition = DBA::mergeConditions($condition, ['contact-type' => $this->accountType]);
 		}
 
@@ -339,6 +350,10 @@ class Timeline extends BaseModule
 
 		$items = [];
 		$result = $this->database->select('post-engagement', ['uri-id', 'created', 'owner-id', 'comments', 'activities'], $condition, $params);
+		if ($this->database->errorNo()) {
+			throw new \Exception($this->database->errorMessage(), $this->database->errorNo());
+		}
+
 		while ($item = $this->database->fetch($result)) {
 			$items[$item['uri-id']] = $item;
 		}
@@ -359,11 +374,59 @@ class Timeline extends BaseModule
 		return $items;
 	}
 
+	private function getUserChannelConditions(int $id, int $uid): array
+	{
+		$channel = $this->channelRepository->selectById($id, $uid);
+		if (empty($channel)) {
+			return [];
+		}
+
+		$condition = [];
+
+		if (!empty($channel->circle)) {
+			if ($channel->circle == -1) {
+				$condition = ["`owner-id` IN (SELECT `pid` FROM `account-user-view` WHERE `uid` = ? AND `rel` IN (?, ?))", $uid, Contact::SHARING, Contact::FRIEND];
+			} elseif ($channel->circle == -2) {
+				$condition = ["`owner-id` IN (SELECT `pid` FROM `account-user-view` WHERE `uid` = ? AND `rel` = ?)", $uid, Contact::FOLLOWER];
+			} elseif ($channel->circle == -3) {
+				$condition = ["EXISTS(SELECT `uri-id` FROM `post-thread-user` WHERE `uid` = ? AND `post-thread-user`.`uri-id` = `post-engagement`.`uri-id`)", $uid];
+			} elseif ($channel->circle > 0) {
+				$condition = DBA::mergeConditions($condition, ["`owner-id` IN (SELECT `pid` FROM `group_member` INNER JOIN `account-user-view` ON `group_member`.`contact-id` = `account-user-view`.`id` WHERE `gid` = ? AND `account-user-view`.`uid` = ?)", $channel->circle, $uid]);
+			}
+		}
+
+		if (!empty($channel->fullTextSearch)) {
+			$search = $channel->fullTextSearch;
+			foreach (Engagement::KEYWORDS as $keyword) {
+				$search = preg_replace('~(' . $keyword . ':.[\w@\.-]+)~', '"$1"', $search);
+			}
+			$condition = DBA::mergeConditions($condition, ["MATCH (`searchtext`) AGAINST (? IN BOOLEAN MODE)", $search]);
+		}
+
+		if (!empty($channel->includeTags)) {
+			$search       = explode(',', mb_strtolower($channel->includeTags));
+			$placeholders = substr(str_repeat("?, ", count($search)), 0, -2);
+			$condition    = DBA::mergeConditions($condition, array_merge(["`uri-id` IN (SELECT `uri-id` FROM `post-tag` INNER JOIN `tag` ON `tag`.`id` = `post-tag`.`tid` WHERE `post-tag`.`type` = 1 AND `name` IN (" . $placeholders . "))"], $search));
+		}
+
+		if (!empty($channel->excludeTags)) {
+			$search       = explode(',', mb_strtolower($channel->excludeTags));
+			$placeholders = substr(str_repeat("?, ", count($search)), 0, -2);
+			$condition    = DBA::mergeConditions($condition, array_merge(["NOT `uri-id` IN (SELECT `uri-id` FROM `post-tag` INNER JOIN `tag` ON `tag`.`id` = `post-tag`.`tid` WHERE `post-tag`.`type` = 1 AND `name` IN (" . $placeholders . "))"], $search));
+		}
+
+		if (!empty($channel->mediaType)) {
+			$condition = DBA::mergeConditions($condition, ["`media-type` & ?", $channel->mediaType]);
+		}
+
+		// For "addLanguageCondition" to work, the condition must not be empty
+		return $condition ?: ["true"];
+	}
+
 	private function addLanguageCondition(int $uid, array $condition): array
 	{
 		$conditions = [];
-		$languages  = $this->pConfig->get($uid, 'channel', 'languages', [User::getLanguageCode($uid)]);
-		$languages  = $this->l10n->convertForLanguageDetection($languages);
+		$languages  = User::getWantedLanguages($uid);
 		foreach ($languages as $language) {
 			$conditions[] = "JSON_EXTRACT(JSON_KEYS(language), '$[0]') = ?";
 			$condition[]  = $language;
@@ -376,7 +439,7 @@ class Timeline extends BaseModule
 
 	private function getMedianComments(int $uid, int $divider): int
 	{
-		$languages = $this->pConfig->get($uid, 'channel', 'languages', [User::getLanguageCode($uid)]);
+		$languages = User::getWantedLanguages($uid);
 		$cache_key = 'Channel:getMedianComments:' . $divider . ':' . implode(':', $languages);
 		$comments  = $this->cache->get($cache_key);
 		if (!empty($comments)) {
@@ -400,7 +463,7 @@ class Timeline extends BaseModule
 
 	private function getMedianActivities(int $uid, int $divider): int
 	{
-		$languages  = $this->pConfig->get($uid, 'channel', 'languages', [User::getLanguageCode($uid)]);
+		$languages  = User::getWantedLanguages($uid);
 		$cache_key  = 'Channel:getMedianActivities:' . $divider . ':' . implode(':', $languages);
 		$activities = $this->cache->get($cache_key);
 		if (!empty($activities)) {
@@ -457,37 +520,54 @@ class Timeline extends BaseModule
 	{
 		$items = $this->selectItems();
 
-		$maxpostperauthor = (int) $this->config->get('system', 'max_author_posts_community_page');
-		if ($maxpostperauthor != 0 && $this->selectedTab == 'local') {
+		if ($this->selectedTab == 'local') {
+			$maxpostperauthor = (int)$this->config->get('system', 'max_author_posts_community_page');
+			$key = 'author-id';
+		} elseif ($this->selectedTab == 'global') {
+			$maxpostperauthor = (int)$this->config->get('system', 'max_server_posts_community_page');
+			$key = 'author-gsid';
+		} else {
+			$maxpostperauthor = 0;
+		}
+		if ($maxpostperauthor != 0) {
 			$count          = 1;
-			$previousauthor = '';
-			$numposts       = 0;
+			$author_posts   = [];
 			$selected_items = [];
 
 			while (count($selected_items) < $this->itemsPerPage && ++$count < 50 && count($items) > 0) {
-				foreach ($items as $item) {
-					if ($previousauthor == $item["author-link"]) {
-						++$numposts;
-					} else {
-						$numposts = 0;
-					}
-					$previousauthor = $item["author-link"];
+				$maxposts = round((count($items) / $this->itemsPerPage) * $maxpostperauthor);
+				$minId = $items[array_key_first($items)]['received'];
+				$maxId = $items[array_key_last($items)]['received'];
+				$this->logger->debug('Blubb', ['tab' => $this->selectedTab, 'count' => $count, 'min' => $minId, 'max' => $maxId]);
 
-					if (($numposts < $maxpostperauthor) && (count($selected_items) < $this->itemsPerPage)) {
-						$selected_items[] = $item;
+				foreach ($items as $item) {
+					$author_posts[$item[$key]][$item['uri-id']] = $item['received'];
+				}
+				foreach ($author_posts as $posts) {
+					if (count($posts) <= $maxposts) {
+						continue;
+					}
+					asort($posts);
+					while (count($posts) > $maxposts) {
+						$uri_id = array_key_first($posts);
+						unset($posts[$uri_id]);
+						unset($items[$uri_id]);
 					}
 				}
+				$selected_items = array_merge($selected_items, $items);
 
 				// If we're looking at a "previous page", the lookup continues forward in time because the list is
 				// sorted in chronologically decreasing order
-				if (isset($this->minId)) {
-					$this->minId = $items[0]['received'];
+				if (!empty($this->minId)) {
+					$this->minId = $minId;
 				} else {
 					// In any other case, the lookup continues backwards in time
-					$this->maxId = $items[count($items) - 1]['received'];
+					$this->maxId = $maxId;
 				}
 
-				$items = $this->selectItems();
+				if (count($selected_items) < $this->itemsPerPage) {
+					$items = $this->selectItems();
+				}
 			}
 		} else {
 			$selected_items = $items;
@@ -543,9 +623,14 @@ class Timeline extends BaseModule
 			}
 		}
 
-		$r = Post::selectThreadForUser($this->session->getLocalUserId() ?: 0, ['uri-id', 'received', 'author-link'], $condition, $params);
+		$items = [];
+		$result = Post::selectThreadForUser($this->session->getLocalUserId() ?: 0, ['uri-id', 'received', 'author-id', 'author-gsid'], $condition, $params);
 
-		$items = Post::toArray($r);
+		while ($item = $this->database->fetch($result)) {
+			$items[$item['uri-id']] = $item;
+		}
+		$this->database->close($result);
+
 		if (empty($items)) {
 			return [];
 		}

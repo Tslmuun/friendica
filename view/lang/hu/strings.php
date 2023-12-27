@@ -229,7 +229,6 @@ $a->strings['The form security token was not correct. This probably happened bec
 $a->strings['All contacts'] = 'Összes partner';
 $a->strings['Followers'] = 'Követők';
 $a->strings['Following'] = 'Követés';
-$a->strings['Mutual friends'] = 'Kölcsönösen ismerősök';
 $a->strings['Common'] = 'Közös';
 $a->strings['Addon not found'] = 'A bővítmény nem található';
 $a->strings['Addon already enabled'] = 'A bővítmény már engedélyezve van';
@@ -630,11 +629,14 @@ $a->strings['Trending Tags (last %d hour)'] = [
 	1 => 'Népszerű címkék (legutóbbi %d óra)',
 ];
 $a->strings['More Trending Tags'] = 'További népszerű címkék';
+$a->strings['Post to group'] = 'Beküldés csoportba';
+$a->strings['Mention'] = 'Említés';
 $a->strings['XMPP:'] = 'XMPP:';
 $a->strings['Matrix:'] = 'Mátrix:';
 $a->strings['Location:'] = 'Hely:';
 $a->strings['Network:'] = 'Hálózat:';
 $a->strings['Unfollow'] = 'Követés megszüntetése';
+$a->strings['View group'] = 'Csoport megtekintése';
 $a->strings['Yourself'] = 'Önmaga';
 $a->strings['Mutuals'] = 'Kölcsönösen ismerősök';
 $a->strings['Post to Email'] = 'Beküldés e-mailbe';
@@ -958,62 +960,6 @@ $a->strings['
 			the administrator of %2$s has set up an account for you.'] = '
 		Kedves %1$s!
 			A(z) %2$s adminisztrátora beállított egy fiókot Önnek.';
-$a->strings['
-		The login details are as follows:
-
-		Site Location:	%1$s
-		Login Name:		%2$s
-		Password:		%3$s
-
-		You may change your password from your account "Settings" page after logging
-		in.
-
-		Please take a few moments to review the other account settings on that page.
-
-		You may also wish to add some basic information to your default profile
-		(on the "Profiles" page) so that other people can easily find you.
-
-		We recommend setting your full name, adding a profile photo,
-		adding some profile "keywords" (very useful in making new friends) - and
-		perhaps what country you live in; if you do not wish to be more specific
-		than that.
-
-		We fully respect your right to privacy, and none of these items are necessary.
-		If you are new and do not know anybody here, they may help
-		you to make some new and interesting friends.
-
-		If you ever want to delete your account, you can do so at %1$s/settings/removeme
-
-		Thank you and welcome to %4$s.'] = '
-		A bejelentkezés részletei a következők:
-
-		Oldal címe:	%1$s
-		Bejelentkezési név:		%2$s
-		Jelszó:		%3$s
-
-		A jelszavát a fiókja „Beállítások” oldalán változtathatja meg, miután
-		bejelentkezett.
-
-		Szánjon pár percet a többi fiókbeállítás felülvizsgálatára is azon az oldalon.
-
-		Érdemes lehet néhány alapvető információt is hozzáadnia az
-		alapértelmezett profiljához (a „Profilok” oldalon), azért hogy más
-		emberek egyszerűen megtalálják Önt.
-
-		Azt ajánljuk, hogy állítsa be a teljes nevét, adjon hozzá
-		profilfényképet, adjon hozzá néhány profil „kulcsszót” (nagyon hasznos
-		új ismerősök kereséséhez), valamint talán azt, hogy mely országban él,
-		ha nem szeretne annál pontosabbat megadni.
-
-		Teljes mértékben tiszteletben tartjuk az adatvédelemmel kapcsolatos
-		jogát, és ezen elemek egyike sem kötelező. Ha még új itt, és senkit
-		sem ismer, akkor ezek segíthetnek Önnek néhány új és érdekes
-		ismerőst találni.
-
-		Ha bármikor törölni szeretné a fiókját, akkor megteheti azt a
-		következő címen: %1$s/settings/removeme
-
-			Köszönjük, és üdvözöljük a %4$s oldalon.';
 $a->strings['Registration details for %s'] = 'Regisztrációs részletek ehhez: %s';
 $a->strings['
 			Dear %1$s,
@@ -1042,62 +988,6 @@ $a->strings['
 				Kedves %1$s!
 				Köszönjük, hogy regisztrált itt: %2$s. A fiókja létrejött.
 			';
-$a->strings['
-			The login details are as follows:
-
-			Site Location:	%3$s
-			Login Name:		%1$s
-			Password:		%5$s
-
-			You may change your password from your account "Settings" page after logging
-			in.
-
-			Please take a few moments to review the other account settings on that page.
-
-			You may also wish to add some basic information to your default profile
-			(on the "Profiles" page) so that other people can easily find you.
-
-			We recommend setting your full name, adding a profile photo,
-			adding some profile "keywords" (very useful in making new friends) - and
-			perhaps what country you live in; if you do not wish to be more specific
-			than that.
-
-			We fully respect your right to privacy, and none of these items are necessary.
-			If you are new and do not know anybody here, they may help
-			you to make some new and interesting friends.
-
-			If you ever want to delete your account, you can do so at %3$s/settings/removeme
-
-			Thank you and welcome to %2$s.'] = '
-			A bejelentkezés részletei a következők:
-
-			Oldal címe:	%3$s
-			Bejelentkezési név:		%1$s
-			Jelszó:		%5$s
-
-			A jelszavát a fiókja „Beállítások” oldalán változtathatja meg, miután
-			bejelentkezett.
-
-			Szánjon pár percet a többi fiókbeállítás felülvizsgálatára is azon az oldalon.
-
-			Érdemes lehet néhány alapvető információt is hozzáadnia az
-			alapértelmezett profiljához (a „Profilok” oldalon), azért hogy más
-			emberek egyszerűen megtalálják Önt.
-
-			Azt ajánljuk, hogy állítsa be a teljes nevét, adjon hozzá
-			profilfényképet, adjon hozzá néhány profil „kulcsszót” (nagyon hasznos
-			új ismerősök kereséséhez), valamint talán azt, hogy mely országban él,
-			ha nem szeretne annál pontosabbat megadni.
-
-			Teljes mértékben tiszteletben tartjuk az adatvédelemmel kapcsolatos
-			jogát, és ezen elemek egyike sem kötelező. Ha még új itt, és senkit
-			sem ismer, akkor ezek segíthetnek Önnek néhány új és érdekes
-			ismerőst találni.
-
-			Ha bármikor törölni szeretné a fiókját, akkor megteheti azt a
-			következő címen: %3$s/settings/removeme
-
-			Köszönjük, és üdvözöljük a %2$s oldalon.';
 $a->strings['Addon not found.'] = 'A bővítmény nem található.';
 $a->strings['Addon %s disabled.'] = 'A(z) „%s” bővítmény letiltva.';
 $a->strings['Addon %s enabled.'] = 'A(z) „%s” bővítmény engedélyezve.';
@@ -1320,8 +1210,6 @@ $a->strings['Enable multiple registrations'] = 'Többszörös regisztrációk en
 $a->strings['Enable users to register additional accounts for use as pages.'] = 'Lehetővé teszi a felhasználóknak, hogy további fiókokat regisztráljanak oldalakként történő használathoz.';
 $a->strings['Enable OpenID'] = 'OpenID engedélyezése';
 $a->strings['Enable OpenID support for registration and logins.'] = 'Az OpenID támogatás engedélyezése a regisztrációnál és a bejelentkezéseknél.';
-$a->strings['Enable Fullname check'] = 'Teljes név ellenőrzésének engedélyezése';
-$a->strings['Enable check to only allow users to register with a space between the first name and the last name in their full name.'] = 'Lehetővé teszi annak ellenőrzését, hogy a felhasználóknak csak a teljes nevükben lévő vezetéknév és a keresztnév közti szóközzel legyen lehetőségük regisztrálniuk.';
 $a->strings['Email administrators on new registration'] = 'E-mail küldése az adminisztrátoroknak új regisztrációkor';
 $a->strings['If enabled and the system is set to an open registration, an email for each new registration is sent to the administrators.'] = 'Ha engedélyezve van, és a rendszer nyitott regisztrációhoz van beállítva, akkor minden új regisztrációról e-mail lesz küldve az adminisztrátoroknak.';
 $a->strings['Community pages for visitors'] = 'Közösségi oldalak a látogatók számára';
@@ -1357,10 +1245,8 @@ $a->strings['Local contacts - contacts of our local contacts are discovered for 
 $a->strings['Interactors - contacts of our local contacts and contacts who interacted on locally visible postings are discovered for their followers/followings.'] = 'Interaktorok: a helyi partnereink partnerei és a helyileg látható beküldésekkel kapcsolatba került partnerek lesznek felfedezve a követőik vagy követésiek számára.';
 $a->strings['Synchronize the contacts with the directory server'] = 'A partnerek szinkronizálása a könyvtárkiszolgálóval';
 $a->strings['if enabled, the system will check periodically for new contacts on the defined directory server.'] = 'Ha engedélyezve van, akkor a rendszer időszakosan ellenőrizni fogja az új partnereket a meghatározott könyvtárkiszolgálón.';
-$a->strings['Days between requery'] = 'Ismételt lekérdezések közti napok';
-$a->strings['Number of days after which a server is requeried for his contacts.'] = 'A napok száma, amely után egy kiszolgáló ismét lekérdezésre kerül a partnereiért.';
 $a->strings['Discover contacts from other servers'] = 'Partnerek felfedezése más kiszolgálókról';
-$a->strings['Periodically query other servers for contacts. The system queries Friendica, Mastodon and Hubzilla servers.'] = 'Más kiszolgálók időszakos lekérdezése partnerek után. A rendszer Friendica, Mastodon és Hubzilla kiszolgálókat kérdez le.';
+$a->strings['Days between requery'] = 'Ismételt lekérdezések közti napok';
 $a->strings['Search the local directory'] = 'A helyi könyvtár keresése';
 $a->strings['Search the local directory instead of the global directory. When searching locally, every search will be executed on the global directory in the background. This improves the search results when the search is repeated.'] = 'A helyi könyvtár keresése a globális könyvtár helyett. Helyi kereséskor minden egyes keresés a globális könyvtárban lesz végrehajtva a háttérben. Ez javítja a keresési eredményeket, ha a keresést megismétlik.';
 $a->strings['Publish server information'] = 'Kiszolgálóinformációk közzététele';
@@ -1716,6 +1602,17 @@ $a->strings['Actions'] = 'Műveletek';
 $a->strings['Status'] = 'Állapot';
 $a->strings['Mirror postings from this contact'] = 'Beküldés tükrözése ettől a partnertől';
 $a->strings['Mark this contact as remote_self, this will cause friendica to repost new entries from this contact.'] = 'A partner megjelölése távoli önmagaként. Ezt azt fogja okozni, hogy a Friendica újraküldi az ettől a partnertől származó új bejegyzéseket.';
+$a->strings['Channel Settings'] = 'Csatorna beállításai';
+$a->strings['Frequency of this contact in relevant channels'] = 'A partner gyakorisága a kapcsolódó csatornákban';
+$a->strings['Depending on the type of the channel not all posts from this contact are displayed. By default, posts need to have a minimum amount of interactions (comments, likes) to show in your channels. On the other hand there can be contacts who flood the channel, so you might want to see only some of their posts. Or you don\'t want to see their content at all, but you don\'t want to block or hide the contact completely.'] = 'A csatorna típusától függően nem minden bejegyzés jelenik meg ettől a partnertől. Alapértelmezetten a bejegyzéseknek minimális számú interakcióval (hozzászólások, kedvelések) kell rendelkezniük ahhoz, hogy megjelenjenek a csatornákon. Másrészt lehetnek olyan partnerek is, akik elárasztják a csatornát, így előfordulhat, hogy csak néhány bejegyzésüket szeretné látni. Vagy egyáltalán nem szeretné látni a tartalmaikat, de nem szeretné teljesen letiltani vagy elrejteni a partnert.';
+$a->strings['Default frequency'] = 'Alapértelmezett gyakoriság';
+$a->strings['Posts by this contact are displayed in the "for you" channel if you interact often with this contact or if a post reached some level of interaction.'] = 'Ennek a partnernek a bejegyzései akkor jelennek meg az „Önnek” csatornán, ha gyakran lép kapcsolatba ezzel a partnerrel, vagy ha egy bejegyzés elért egy bizonyos interakciós szintet.';
+$a->strings['Display all posts of this contact'] = 'A partner összes bejegyzésének megjelenítése';
+$a->strings['All posts from this contact will appear on the "for you" channel'] = 'Ennek a partnernek az összes bejegyzése megjelenik az „Önnek” csatornán.';
+$a->strings['Display only few posts'] = 'Csak néhány bejegyzés megjelenítése';
+$a->strings['When a contact creates a lot of posts in a short period, this setting reduces the number of displayed posts in every channel.'] = 'Ha egy partner rövid időn belül sok bejegyzést hoz létre, akkor ez a beállítás csökkenti a megjelenített bejegyzések számát minden csatornán.';
+$a->strings['Never display posts'] = 'Soha se jelenítsen meg bejegyzéseket';
+$a->strings['Posts from this contact will never be displayed in any channel'] = 'Ennek a partnernek a bejegyzései soha sem jelennek meg semmilyen csatornán.';
 $a->strings['Refetch contact data'] = 'Partneradatok ismételt lekérése';
 $a->strings['Toggle Blocked status'] = 'Tiltott állapot átváltása';
 $a->strings['Toggle Ignored status'] = 'Mellőzött állapot átváltása';
@@ -1814,11 +1711,6 @@ $a->strings['Output'] = 'Kimenet';
 $a->strings['Lookup address'] = 'Keresési cím';
 $a->strings['Webfinger Diagnostic'] = 'WebFinger diagnosztika';
 $a->strings['Lookup address:'] = 'Keresési cím:';
-$a->strings['You are now logged in as %s'] = 'Most a következő néven van bejelentkezve: %s';
-$a->strings['Switch between your accounts'] = 'Váltás a fiókjai között';
-$a->strings['Manage your accounts'] = 'Fiókok kezelése';
-$a->strings['Toggle between different identities or community/group pages which share your account details or which you have been granted "manage" permissions'] = 'Váltás a különböző személyazonosságok vagy közösségi és csoportoldalak között, amelyek megosztják a fiókja részleteit, vagy amelyeket „kezelés” jogosultságokkal ruházott fel';
-$a->strings['Select an identity to manage: '] = 'A kezelendő személyazonosság kiválasztása: ';
 $a->strings['No entries (some entries may be hidden).'] = 'Nincsenek bejegyzések (néhány bejegyzés rejtve lehet).';
 $a->strings['Find on this site'] = 'Keresés ezen az oldalon';
 $a->strings['Results for:'] = 'Találat erre:';
@@ -2045,7 +1937,6 @@ $a->strings['Tag'] = 'Címke';
 $a->strings['Type'] = 'Típus';
 $a->strings['Term'] = 'Kifejezés';
 $a->strings['URL'] = 'URL';
-$a->strings['Mention'] = 'Említés';
 $a->strings['Implicit Mention'] = 'Implicit említés';
 $a->strings['Item not found'] = 'Az elem nem található';
 $a->strings['No source recorded'] = 'Nincs forrás rögzítve';
@@ -2287,7 +2178,6 @@ $a->strings['Note for the admin'] = 'Jegyzet az adminisztrátornak';
 $a->strings['Leave a message for the admin, why you want to join this node'] = 'Hagyjon üzenetet az adminisztrátornak, hogy miért szeretne ehhez a csomóponthoz csatlakozni';
 $a->strings['Membership on this site is by invitation only.'] = 'Ezen az oldalon a tagság csak meghívás alapján van.';
 $a->strings['Your invitation code: '] = 'A meghívási kódja: ';
-$a->strings['Your Full Name (e.g. Joe Smith, real or real-looking): '] = 'A teljes neve (például Kovács János, valódi vagy valódinak látszó): ';
 $a->strings['Your Email Address: (Initial information will be send there, so this has to be an existing address.)'] = 'Az e-mail-címe (a kezdeti információk ide lesznek elküldve, szóval ennek létező címnek kell lennie):';
 $a->strings['Please repeat your e-mail address:'] = 'Ismételje meg az e-mail-címét:';
 $a->strings['New Password:'] = 'Új jelszó:';
@@ -2477,6 +2367,8 @@ $a->strings['If you have moved this profile from another server, and some of you
 $a->strings['Resend relocate message to contacts'] = 'Áthelyezési üzenet küldése a partnereknek';
 $a->strings['Addon Settings'] = 'Bővítménybeállítások';
 $a->strings['No Addon settings configured'] = 'Nincsenek bővítménybeállítások meghatározva';
+$a->strings['Description'] = 'Leírás';
+$a->strings['Add'] = 'Hozzáadás';
 $a->strings['Failed to connect with email account using the settings provided.'] = 'Nem sikerült kapcsolódni a megadott beállításokat használó e-mail-fiókkal.';
 $a->strings['Diaspora (Socialhome, Hubzilla)'] = 'Diaspora (Socialhome, Hubzilla)';
 $a->strings['Built-in support for %s connectivity is enabled'] = 'A(z) %s összekapcsolhatóságának beépített támogatása engedélyezve';
@@ -2533,7 +2425,6 @@ $a->strings['Delegates'] = 'Meghatalmazottak';
 $a->strings['Delegates are able to manage all aspects of this account/page except for basic account settings. Please do not delegate your personal account to anybody that you do not trust completely.'] = 'A meghatalmazottak képesek ezen fiókot vagy oldalt minden szempontból kezelni, kivéve az alapvető fiókbeállításokat. Ne hatalmazzon meg senki mást a személyes fiókja kezeléséhez, akiben nem bízik meg teljes mértékben.';
 $a->strings['Existing Page Delegates'] = 'Meglévő oldalmeghatalmazottak';
 $a->strings['Potential Delegates'] = 'Lehetséges meghatalmazottak';
-$a->strings['Add'] = 'Hozzáadás';
 $a->strings['No entries.'] = 'Nincsenek bejegyzések.';
 $a->strings['The theme you chose isn\'t available.'] = 'A választott téma nem érhető el.';
 $a->strings['%s - (Unsupported)'] = '%s – (nem támogatott)';
@@ -2568,13 +2459,10 @@ $a->strings['Stay local'] = 'Maradjon helyi';
 $a->strings['Don\'t go to a remote system when following a contact link.'] = 'Ne menjen távoli rendszerre, ha egy partnerhivatkozást követ.';
 $a->strings['Link preview mode'] = 'Hivatkozás-előnézeti mód';
 $a->strings['Appearance of the link preview that is added to each post with a link.'] = 'A hivatkozás előnézetének megjelenése, amely minden egyes hivatkozással rendelkező bejegyzéshez hozzá van adva.';
-$a->strings['Timelines for the network page:'] = 'Idővonalak a hálózat oldalhoz:';
-$a->strings['Select all the timelines that you want to see on your network page.'] = 'Válassza ki az összes olyan idővonalat, amelyet látni szeretne a hálózat oldalon.';
 $a->strings['Channel languages:'] = 'Csatorna nyelvei:';
 $a->strings['Select all languages that you want to see in your channels.'] = 'Válassza ki az összes nyelvet, amelyet látni szeretne a csatornáiban.';
 $a->strings['Beginning of week:'] = 'A hét kezdete:';
 $a->strings['Default calendar view:'] = 'Alapértelmezett naptárnézet:';
-$a->strings['%s: %s'] = '%s: %s';
 $a->strings['Additional Features'] = 'További funkciók';
 $a->strings['Connected Apps'] = 'Kapcsolt alkalmazások';
 $a->strings['Remove authorization'] = 'Felhatalmazás eltávolítása';
@@ -2638,7 +2526,6 @@ $a->strings['[Friendica System Notify]'] = '[Friendica rendszerértesítés]';
 $a->strings['User deleted their account'] = 'A felhasználó törölte a fiókját';
 $a->strings['On your Friendica node an user deleted their account. Please ensure that their data is removed from the backups.'] = 'Az Ön Friendica csomópontján egy felhasználó törölte a fiókját. Győződjön meg arról, hogy az adatai el lettek-e távolítva a biztonsági mentésekből.';
 $a->strings['The user id is %d'] = 'A felhasználó-azonosító %d';
-$a->strings['Your user account has been successfully removed. Bye bye!'] = 'A felhasználói fiókja sikeresen el lett távolítva. Viszlát!';
 $a->strings['Remove My Account'] = 'Saját fiók eltávolítása';
 $a->strings['This will completely remove your account. Once this has been done it is not recoverable.'] = 'Ez teljesen el fogja távolítani a fiókját. Miután ez megtörtént, nem lesz visszaállítható.';
 $a->strings['Please enter your password for verification:'] = 'Adja meg a jelszavát az ellenőrzéshez:';
@@ -2659,7 +2546,6 @@ $a->strings['App-specific password successfully revoked.'] = 'Az alkalmazásfüg
 $a->strings['Two-factor app-specific passwords'] = 'Kétlépcsős alkalmazásfüggő jelszavak';
 $a->strings['<p>App-specific passwords are randomly generated passwords used instead your regular password to authenticate your account on third-party applications that don\'t support two-factor authentication.</p>'] = '<p>Az alkalmazásfüggő jelszavak az Ön szokásos jelszava helyett használt véletlenszerűen előállított jelszavak, hogy hitelesítsék a fiókját az olyan harmadik féltől származó alkalmazásoknál, amelyek nem támogatják a kétlépcsős hitelesítést.</p>';
 $a->strings['Make sure to copy your new app-specific password now. You won’t be able to see it again!'] = 'Győződjön meg arról, hogy lemásolta-e most az új alkalmazásfüggő jelszavát. Nem fogja tudni újra megnézni a jelszót!';
-$a->strings['Description'] = 'Leírás';
 $a->strings['Last Used'] = 'Legutóbb használt';
 $a->strings['Revoke'] = 'Visszavonás';
 $a->strings['Revoke All'] = 'Összes visszavonása';
@@ -2761,6 +2647,11 @@ $a->strings['Privacy Statement'] = 'Adatvédelmi nyilatkozat';
 $a->strings['Rules'] = 'Szabályok';
 $a->strings['Parameter uri_id is missing.'] = 'Az uri_id paraméter hiányzik.';
 $a->strings['The requested item doesn\'t exist or has been deleted.'] = 'A kért elem nem létezik vagy törölték.';
+$a->strings['You are now logged in as %s'] = 'Most a következő néven van bejelentkezve: %s';
+$a->strings['Switch between your accounts'] = 'Váltás a fiókjai között';
+$a->strings['Manage your accounts'] = 'Fiókok kezelése';
+$a->strings['Toggle between different identities or community/group pages which share your account details or which you have been granted "manage" permissions'] = 'Váltás a különböző személyazonosságok vagy közösségi és csoportoldalak között, amelyek megosztják a fiókja részleteit, vagy amelyeket „kezelés” jogosultságokkal ruházott fel';
+$a->strings['Select an identity to manage: '] = 'A kezelendő személyazonosság kiválasztása: ';
 $a->strings['User imports on closed servers can only be done by an administrator.'] = 'A lezárt kiszolgálókon történő felhasználó-importálásokat csak egy adminisztrátor végezheti el.';
 $a->strings['Move account'] = 'Fiók áthelyezése';
 $a->strings['You can import an account from another Friendica server.'] = 'Importálhat egy fiókot egy másik Friendica kiszolgálóról.';
@@ -2886,11 +2777,6 @@ $a->strings['Please visit %s  if you wish to make any changes to this relationsh
 $a->strings['registration request'] = 'regisztrációs kérés';
 $a->strings['You\'ve received a registration request from \'%1$s\' at %2$s'] = 'Kapott egy regisztrációs kérést „%1$s” partnertől itt: %2$s';
 $a->strings['You\'ve received a [url=%1$s]registration request[/url] from %2$s.'] = 'Kapott egy %2$s által elküldött [url=%1$s]regisztrációs kérést[/url].';
-$a->strings['Full Name:	%s
-Site Location:	%s
-Login Name:	%s (%s)'] = 'Teljes név:	%s
-Oldal címe:	%s
-Bejelentkezési név:	%s (%s)';
 $a->strings['Please visit %s to approve or reject the request.'] = 'Látogassa meg a(z) %s oldalt a kérés jóváhagyásához vagy visszautasításához.';
 $a->strings['new registration'] = 'új regisztráció';
 $a->strings['You\'ve received a new registration from \'%1$s\' at %2$s'] = 'Kapott egy új regisztrációs kérést „%1$s” partnertől itt: %2$s';

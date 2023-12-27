@@ -56,7 +56,7 @@ use Friendica\Database\DBA;
 
 // This file is required several times during the test in DbaDefinition which justifies this condition
 if (!defined('DB_UPDATE_VERSION')) {
-	define('DB_UPDATE_VERSION', 1534);
+	define('DB_UPDATE_VERSION', 1542);
 }
 
 return [
@@ -549,6 +549,25 @@ return [
 		"indexes" => [
 			"PRIMARY" => ["k"],
 			"k_expires" => ["k", "expires"],
+		]
+	],
+	"channel" => [
+		"comment" => "User defined Channels",
+		"fields" => [
+			"id" => ["type" => "int unsigned", "not null" => "1", "extra" => "auto_increment", "primary" => "1", "comment" => ""],
+			"uid" => ["type" => "mediumint unsigned", "not null" => "1", "foreign" => ["user" => "uid"], "comment" => "User id"],
+			"label" => ["type" => "varchar(64)", "not null" => "1", "comment" => "Channel label"],
+			"description" => ["type" => "varchar(64)", "comment" => "Channel description"],
+			"circle" => ["type" => "int", "comment" => "Circle or channel that this channel is based on"],
+			"access-key" => ["type" => "varchar(1)", "comment" => "Access key"],
+			"include-tags" => ["type" => "varchar(1023)", "comment" => "Comma separated list of tags that will be included in the channel"],
+			"exclude-tags" => ["type" => "varchar(1023)", "comment" => "Comma separated list of tags that aren't allowed in the channel"],
+			"full-text-search" => ["type" => "varchar(1023)", "comment" => "Full text search pattern, see https://mariadb.com/kb/en/full-text-index-overview/#in-boolean-mode"],
+			"media-type" => ["type" => "smallint unsigned", "comment" => "Filtered media types"],
+		],
+		"indexes" => [
+			"PRIMARY" => ["id"],
+			"uid" => ["uid"],
 		]
 	],
 	"config" => [
@@ -1332,6 +1351,7 @@ return [
 			"contact-type" => ["type" => "tinyint", "not null" => "1", "default" => "0", "comment" => "Person, organisation, news, community, relay"],
 			"media-type" => ["type" => "tinyint", "not null" => "1", "default" => "0", "comment" => "Type of media in a bit array (1 = image, 2 = video, 4 = audio"],
 			"language" => ["type" => "varbinary(128)", "comment" => "Language information about this post"],
+			"searchtext" => ["type" => "mediumtext", "comment" => "Simplified text for the full text search"],
 			"created" => ["type" => "datetime", "comment" => ""],
 			"restricted" => ["type" => "boolean", "not null" => "1", "default" => "0", "comment" => "If true, this post is either unlisted or not from a federated network"],
 			"comments" => ["type" => "mediumint unsigned", "comment" => "Number of comments"],
@@ -1341,6 +1361,7 @@ return [
 			"PRIMARY" => ["uri-id"],
 			"owner-id" => ["owner-id"],
 			"created" => ["created"],
+			"searchtext" => ["FULLTEXT", "searchtext"],
 		]
 	],
 	"post-history" => [
@@ -1530,7 +1551,8 @@ return [
 			"event-id" => ["event-id"],
 			"psid" => ["psid"],
 			"author-id_uid" => ["author-id", "uid"],
-			"author-id_received" => ["author-id", "received"],
+			"author-id_created" => ["author-id", "created"],
+			"owner-id_created" => ["owner-id", "created"],
 			"parent-uri-id_uid" => ["parent-uri-id", "uid"],
 			"uid_wall_received" => ["uid", "wall", "received"],
 			"uid_contactid" => ["uid", "contact-id"],
@@ -1580,11 +1602,18 @@ return [
 			"post-user-id" => ["post-user-id"],
 			"commented" => ["commented"],
 			"received" => ["received"],
+			"author-id_created" => ["author-id", "created"],
+			"owner-id_created" => ["owner-id", "created"],
 			"uid_received" => ["uid", "received"],
 			"uid_wall_received" => ["uid", "wall", "received"],
 			"uid_commented" => ["uid", "commented"],
+			"uid_received" => ["uid", "received"],
+			"uid_created" => ["uid", "created"],
 			"uid_starred" => ["uid", "starred"],
 			"uid_mention" => ["uid", "mention"],
+			"contact-id_commented" => ["contact-id", "commented"],
+			"contact-id_received" => ["contact-id", "received"],
+			"contact-id_created" => ["contact-id", "created"],
 		]
 	],
 	"post-user-notification" => [
@@ -1836,6 +1865,17 @@ return [
 			"application-id_uid" => ["UNIQUE", "application-id", "uid"],
 			"uid_application-id" => ["uid", "application-id"],
 		]
+	],
+	"check-full-text-search" => [
+		"comment" => "Check for a full text search match in user defined channels before storing the message in the system",
+		"fields" => [
+			"pid" => ["type" => "int unsigned", "not null" => "1", "primary" => "1", "comment" => "The ID of the process"],
+			"searchtext" => ["type" => "mediumtext", "comment" => "Simplified text for the full text search"],
+		],
+		"indexes" => [
+			"PRIMARY" => ["pid"],
+			"searchtext" => ["FULLTEXT", "searchtext"],
+		],
 	],
 	"userd" => [
 		"comment" => "Deleted usernames",

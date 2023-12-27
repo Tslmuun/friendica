@@ -48,6 +48,7 @@ use Friendica\Model\User;
 use Friendica\Network\HTTPException;
 use Friendica\Object\EMail\ItemCCEMail;
 use Friendica\Protocol\Activity;
+use Friendica\Protocol\ActivityPub;
 use Friendica\Util\ACLFormatter;
 use Friendica\Util\DateTimeFormat;
 use Friendica\Util\Emailer;
@@ -297,7 +298,7 @@ class Item
 
 			if ($this->activity->match($item['verb'], Activity::TAG)) {
 				$fields = [
-					'author-id', 'author-link', 'author-name', 'author-network',
+					'author-id', 'author-link', 'author-name', 'author-network', 'author-link', 'author-alias',
 					'verb', 'object-type', 'resource-id', 'body', 'plink'
 				];
 				$obj = Post::selectFirst($fields, ['uri' => $item['parent-uri']]);
@@ -635,7 +636,7 @@ class Item
 	public function addSharedPost(array $item, string $body = ''): string
 	{
 		if (empty($body)) {
-			$body = $item['body'];
+			$body = $item['body'] ?? '';
 		}
 
 		if (empty($item['quote-uri-id']) || ($item['quote-uri-id'] == $item['uri-id'])) {
@@ -991,12 +992,14 @@ class Item
 			$post['deny_gid']  = $owner['deny_gid'];
 		}
 
-		if ($post['allow_gid'] || $post['allow_cid'] || $post['deny_gid'] || $post['deny_cid']) {
-			$post['private'] = ItemModel::PRIVATE;
-		} elseif ($this->pConfig->get($post['uid'], 'system', 'unlisted')) {
-			$post['private'] = ItemModel::UNLISTED;
-		} else {
-			$post['private'] = ItemModel::PUBLIC;
+		if (!isset($post['private'])) {
+			if ($post['allow_gid'] || $post['allow_cid'] || $post['deny_gid'] || $post['deny_cid']) {
+				$post['private'] = ItemModel::PRIVATE;
+			} elseif ($this->pConfig->get($post['uid'], 'system', 'unlisted')) {
+				$post['private'] = ItemModel::UNLISTED;
+			} else {
+				$post['private'] = ItemModel::PUBLIC;
+			}
 		}
 
 		if (empty($post['contact-id'])) {
@@ -1064,6 +1067,42 @@ class Item
 				$address,
 				$author['thumb'] ?? ''
 			));
+		}
+	}
+
+	public function copyPermissions(int $fromUriId, int $toUriId, int $parentUriId)
+	{
+		$from          = Post::selectFirstPost(['author-id'], ['uri-id' => $fromUriId]);
+		$from_author   = DBA::selectFirst('account-view', ['ap-followers'], ['id' => $from['author-id']]);
+		$to            = Post::selectFirstPost(['author-id'], ['uri-id' => $toUriId]);
+		$to_author     = DBA::selectFirst('account-view', ['ap-followers'], ['id' => $to['author-id']]);
+		$parent        = Post::selectFirstPost(['author-id'], ['uri-id' => $parentUriId]);
+		$parent_author = DBA::selectFirst('account-view', ['ap-followers'], ['id' => $parent['author-id']]);
+		
+		$followers = '';
+		foreach (array_column(Tag::getByURIId($parentUriId, [Tag::TO, Tag::CC, Tag::BCC]), 'url') as $url) {
+			if ($url == $parent_author['ap-followers']) {
+				$followers = $url;
+				break;
+			}
+		}
+
+		$existing = array_column(Tag::getByURIId($toUriId, [Tag::TO, Tag::CC, Tag::BCC]), 'url');
+
+		foreach (Tag::getByURIId($fromUriId, [Tag::TO, Tag::CC, Tag::BCC]) as $receiver) {
+			if ($receiver['url'] == $from_author['ap-followers']) {
+				if (!empty($followers)) {
+					$receiver['url']  = $followers;
+					$receiver['name'] = trim(parse_url($receiver['url'], PHP_URL_PATH), '/');
+					Tag::store($toUriId, $receiver['type'], $receiver['name'], $receiver['url']);
+				}
+				$receiver['url']  = $to_author['ap-followers'];
+				$receiver['name'] = trim(parse_url($receiver['url'], PHP_URL_PATH), '/');
+			}
+			if (in_array($receiver['url'], $existing)) {
+				continue;
+			}
+			Tag::store($toUriId, $receiver['type'], $receiver['name'], $receiver['url']);
 		}
 	}
 }
